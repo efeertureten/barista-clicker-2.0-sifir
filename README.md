@@ -29,7 +29,7 @@ Kahve demle, sat, dükkânını seyyar tezgâhtan kahve imparatorluğuna büyüt
 
 ## Yükseltmeler
 
-Her alımda fiyat %15 artar.
+Her alımda fiyat %15 artar. Bütün bu değerler `src/game/config.js` dosyasında.
 
 | | Yükseltme | Etki | Başlangıç fiyatı |
 |---|---|---|---|
@@ -67,7 +67,22 @@ npm run preview  # derlemeyi yerelde aç
 
 ```
 src/
-  BaristaClicker.jsx     oyunun tamamı (durum, döngü, kayıt, ses motoru, arayüz)
+  BaristaClicker.jsx     arayüz ve oyun döngüsü; aşağıdaki modülleri birbirine bağlar
+  game/
+    config.js            ayarlanabilir bütün denge değerleri (fiyatlar, artış oranı, dükkân eşikleri)
+    content.js           yükseltme ve dükkân adları, açıklamaları, görselleri
+    economy.js           saf oyun mantığı: tık, üretim, satın alma, seviye hesabı
+    save.js              oyun kaydını okuma, doğrulama ve yazma
+    meta.js              kurulum tarihi, oturum sayısı, oyun süresi, ilk deneyim adımları
+    format.js            sayı ve para biçimleri
+  audio/
+    soundEngine.js       Web Audio ses motoru (efekt ve müzik kanalları, müzik kısma)
+    sounds.js            ses dosyalarının listesi ve müzik döngü noktaları
+  analytics/
+    analytics.js         ölçüm katmanı: izin, olay sırası, Firebase ve hata ayıklama çıkışı
+    firebaseConfig.js    Firebase yapılandırması (boşken hiçbir yere veri gitmez)
+  ui/                    stiller, ses düğmesi, veri izni bandı
+  lib/                   localStorage ve dosya yolu yardımcıları
   barista-assets/        oyun görselleri (WebP)
   barista-sounds/        oyun sesleri (MP3)
   main.jsx, index.css    giriş noktası ve Tailwind
@@ -75,8 +90,33 @@ public/                  favicon ve uygulama ikonları
 docs/                    README ekran görüntüleri
 ```
 
-Bileşen başka bir React projesine de taşınabilir: `BaristaClicker.jsx` ile `barista-assets/` ve `barista-sounds/` klasörlerini aynı yere koyman yeterli. Tailwind CSS 3 ve `lucide-react` gerekir.
+Oyun dengesini değiştirmek için yalnızca `src/game/config.js` dosyasına dokunmak yeter; `BaristaClicker` bileşeni farklı bir yapılandırmayı `config` özelliğiyle de alabilir. Bu, ileride değerleri Firebase Remote Config'ten çekip A/B testi yapmanın temeli.
+
+## Ölçüm
+
+Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek için oynanış olaylarını Firebase Analytics'e gönderebilir. Varsayılan olarak kapalıdır.
+
+- `src/analytics/firebaseConfig.js` boşken hiçbir yere veri gitmez, veri izni de sorulmaz.
+- Yapılandırma girildiğinde oyuncuya ilk tıklamadan sonra köşede bir izin bandı çıkar. "Kabul et" demeden hiçbir olay gönderilmez; o ana kadar biriken olaylar kabul edilirse gönderilir, reddedilirse silinir. Karar, alttaki "Veri izni" bağlantısından her zaman değiştirilebilir.
+- Firebase kütüphanesi ayrı bir parça olarak yalnızca izin verildiğinde indirilir; izin vermeyen oyuncunun yükleme süresi değişmez.
+- Ad, e-posta gibi kişisel bilgi toplanmaz.
+
+**Firebase'i bağlamak:** [Firebase konsolunda](https://console.firebase.google.com/) bir proje aç, Google Analytics'i etkinleştir, projeye bir web uygulaması ekle ve verilen `firebaseConfig` nesnesini `src/analytics/firebaseConfig.js` dosyasına yapıştır. Bu değerler gizli değildir, her ziyaretçinin tarayıcısına zaten gönderilir.
+
+**Hata ayıklama:** adrese `?debug=1` eklenince olaylar Firebase olmadan da tarayıcı konsoluna `[ölçüm]` önekiyle yazılır ve `window.__bcAnalytics` listesinde birikir. `?debug=0` kapatır.
+
+| Olay | Ne zaman | Başlıca bilgiler |
+|---|---|---|
+| `session_begin` | oyun açıldığında ya da 30 dakikadan uzun aradan sonra sekmeye dönüldüğünde | oturum numarası, kurulumdan beri geçen gün, kaç dakika uzak kalındığı, dükkân seviyesi |
+| `ftue_step` | ilk deneyim adımları, her biri bir kez: `first_brew`, `first_purchase`, `first_level_up` | adım adı ve sırası |
+| `level_up` | dükkân büyüdüğünde | yeni seviye ve adı, toplam aktif oyun dakikası |
+| `spend_virtual_currency` | yükseltme alındığında | yükseltme, ödenen tutar, alımdan sonraki adet, dükkân seviyesi |
+| `settings_change` | ses ya da müzik açılıp kapatıldığında | ayar ve yeni değeri |
+| `game_reset` | oyun sıfırlandığında | sıfırlamadan önceki seviye, fincan ve tık sayısı |
+| `app_error` | yakalanmamış bir hata olduğunda | hata türü ve kısa mesajı |
+
+Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `max_shop_level`, `sound`, `music`. Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
 
 ## Görseller ve sesler
 
-Bütün görseller ve sesler Google Gemini ile üretildi. Nesnelerin yeşil zeminleri temizlenip şeffaf yapıldı, dükkân sahneleri aynı ölçekte kırpıldı; böylece dükkân büyüdükçe sahne de büyüyor. Ses efektleri Gemini'nin ürettiği parçaların tekil vuruşlarından kesildi, seviyeleri birbirine göre dengelendi. Müzik döngüsü, parçanın kendini tekrar eden iki bölümü arasından kuruldu ve dikiş noktası yumuşak geçişle birleştirildi; döngü noktaları `BaristaClicker.jsx` içindeki `MUSIC_TRACK` sabitinde. Tarayıcılar ilk etkileşimden önce ses çalmaya izin vermediği için sesler ilk tıklamayla başlar; müzik dosyası da sayfa açılışını yavaşlatmasın diye ancak o zaman indirilir.
+Bütün görseller ve sesler Google Gemini ile üretildi. Nesnelerin yeşil zeminleri temizlenip şeffaf yapıldı, dükkân sahneleri aynı ölçekte kırpıldı; böylece dükkân büyüdükçe sahne de büyüyor. Ses efektleri Gemini'nin ürettiği parçaların tekil vuruşlarından kesildi, seviyeleri birbirine göre dengelendi. Müzik döngüsü, parçanın kendini tekrar eden iki bölümü arasından kuruldu ve dikiş noktası yumuşak geçişle birleştirildi; döngü noktaları `src/audio/sounds.js` içindeki `MUSIC_TRACK` sabitinde. Tarayıcılar ilk etkileşimden önce ses çalmaya izin vermediği için sesler ilk tıklamayla başlar; müzik dosyası da sayfa açılışını yavaşlatmasın diye ancak o zaman indirilir.
