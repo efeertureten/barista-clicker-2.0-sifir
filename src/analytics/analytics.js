@@ -47,7 +47,8 @@ export function subscribe(listener) {
 async function loadFirebase() {
   const [{ initializeApp }, lib] = await Promise.all([import('firebase/app'), import('firebase/analytics')]);
   if (!(await lib.isSupported())) return null;
-  const instance = lib.getAnalytics(initializeApp(FIREBASE_CONFIG));
+  // Hata ayıklama modunda bu tarayıcının olayları Firebase konsolundaki DebugView'da canlı görünür
+  const instance = lib.initializeAnalytics(initializeApp(FIREBASE_CONFIG), debug ? { config: { debug_mode: true } } : {});
   return {
     log: (name, params) => lib.logEvent(instance, name, params),
     setUserProperties: (props) => lib.setUserProperties(instance, props),
@@ -127,8 +128,26 @@ export function setConsent(value) {
   } else {
     queue = [];
     backend?.setEnabled(false);
+    clearAnalyticsCookies();
   }
   listeners.forEach((listener) => listener(consent));
+}
+
+// İzin geri çekilince Google Analytics'in bıraktığı _ga çerezleri silinir
+function clearAnalyticsCookies() {
+  try {
+    const host = window.location.hostname;
+    document.cookie.split(';').forEach((pair) => {
+      const name = pair.split('=')[0].trim();
+      if (!name.startsWith('_ga')) return;
+      const expired = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+      document.cookie = expired;
+      document.cookie = `${expired}; domain=${host}`;
+      document.cookie = `${expired}; domain=.${host}`;
+    });
+  } catch {
+    /* çerezlere erişilemiyorsa yapılacak bir şey yok */
+  }
 }
 
 // Parametreler: sayılar sonlu ve en çok 2 ondalık, metinler en çok 100 karakter, boş değerler atılır

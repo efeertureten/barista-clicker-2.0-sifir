@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gizlilik · Barista Clicker</title>
+    <meta name="description" content="Barista Clicker hangi verileri, neden ve nasıl topluyor." />
+    <meta name="theme-color" content="#24150d" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+    <style>
+      :root {
+        --milk: #fbf6ee;
+        --foam: #f1e6d6;
+        --line: #dcc8ad;
+        --ink: #2b1a11;
+        --roast: #6b4029;
+        --muted: #86654f;
+        --crema-deep: #9c5f1e;
+        color-scheme: light;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--foam);
+        color: var(--ink);
+        font: 16px/1.6 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      main {
+        max-width: 42rem;
+        margin: 2rem auto;
+        padding: 2rem 1.5rem 2.5rem;
+        background: var(--milk);
+        border: 1px solid var(--line);
+        border-radius: 1.5rem;
+      }
+      @media (max-width: 720px) {
+        main { margin: 0; border: 0; border-radius: 0; min-height: 100vh; padding: 1.5rem 1rem 2rem; }
+      }
+      .back { color: var(--roast); font-size: 0.875rem; font-weight: 600; text-decoration: none; }
+      .back:hover { text-decoration: underline; }
+      h1 { font-size: 1.875rem; line-height: 1.15; margin: 1rem 0 0.25rem; letter-spacing: -0.01em; }
+      .updated { color: var(--muted); font-size: 0.875rem; margin: 0 0 1.5rem; }
+      h2 { font-size: 1.125rem; margin: 2rem 0 0.5rem; }
+      p, li { color: var(--roast); }
+      ul { padding-left: 1.25rem; margin: 0.5rem 0; }
+      li { margin: 0.25rem 0; }
+      strong { color: var(--ink); }
+      a { color: var(--crema-deep); }
+      .summary {
+        background: var(--foam);
+        border-radius: 1rem;
+        padding: 1rem 1.25rem;
+        margin: 0 0 1rem;
+      }
+      .summary p { margin: 0; color: var(--ink); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="back" href="./">← Oyuna dön</a>
+      <h1>Gizlilik</h1>
+      <p class="updated">Son güncelleme: 12 Ekim 2026</p>
+
+      <div class="summary">
+        <p>
+          Barista Clicker, <strong>yalnızca sen izin verirsen</strong> oynanış verilerini Google Analytics for Firebase
+          ile toplar. İzin vermezsen hiçbir veri gönderilmez ve Google'ın ölçüm kodu tarayıcına hiç indirilmez. Adın,
+          e-postan ya da telefonun toplanmaz; oyunda hesap yoktur.
+        </p>
+      </div>
+
+      <h2>Hangi veriler toplanır?</h2>
+      <ul>
+        <li>
+          <strong>Oynanış olayları:</strong> oyunu açman, dükkân seviyesi atlaman, yükseltme alman, sesi ya da müziği
+          açıp kapatman, oyunu sıfırlaman ve oyunda bir hata oluşması.
+        </li>
+        <li>
+          <strong>Oyun içi değerler:</strong> dükkân seviyesi, oturum sayısı, toplam oyun süresi, oyuna ilk başladığın
+          gün ve oyunun sürüm numarası.
+        </li>
+        <li>
+          <strong>Google Analytics'in kendiliğinden topladıkları:</strong> cihaz türü, tarayıcı, işletim sistemi,
+          ekran boyutu, dil ve IP adresinden çıkarılan yaklaşık konum (ülke, şehir). Google Analytics IP adresinin
+          kendisini saklamaz.
+        </li>
+        <li>
+          <strong>Çerezler:</strong> Google Analytics, aynı tarayıcıdan gelen ziyaretleri birbirine bağlayabilmek
+          için tarayıcına rastgele bir kimlik içeren çerezler (<code>_ga</code> ile başlayanlar) yerleştirir.
+        </li>
+      </ul>
+
+      <h2>Neden?</h2>
+      <p>
+        Oyuncuların hangi noktada oyunu bıraktığını, hangi yükseltmelerin fazla pahalı ya da ucuz kaldığını ve
+        oyunda hata olup olmadığını görmek için. Veriler oyunu geliştirmek dışında bir amaçla kullanılmaz ve
+        satılmaz.
+      </p>
+
+      <h2>Veriler nerede tutulur, ne kadar süre?</h2>
+      <p>
+        Veriler Google'ın sunucularında, Türkiye dışında (çoğunlukla ABD'de) işlenir; izin verirken bu yurt dışı
+        aktarımına da onay vermiş olursun. Ayrıntılı oynanış verileri en çok 14 ay saklanır, ardından Google
+        tarafından silinir.
+      </p>
+
+      <h2>Oyun kaydın</h2>
+      <p>
+        Oyundaki ilerlemen yalnızca bu tarayıcının yerel deposunda tutulur ve hiçbir yere gönderilmez. "Oyunu
+        sıfırla" düğmesi ya da tarayıcı verilerini silmek onu kaldırır.
+      </p>
+
+      <h2>Kararını değiştirmek</h2>
+      <ul>
+        <li>
+          Oyunun altındaki <strong>"Veri izni"</strong> bağlantısından iznini istediğin an geri çekebilir ya da
+          yeniden verebilirsin.
+        </li>
+        <li>İzni geri çektiğinde yeni veri gönderilmez ve Google Analytics çerezleri bu tarayıcıdan silinir.</li>
+        <li>
+          Daha önce gönderilmiş verilerinin silinmesini istersen ya da bir sorun olursa
+          <a href="https://github.com/efeertureten/barista-clicker-2.0-sifir/issues">oyunun GitHub sayfasından</a>
+          bize yazabilirsin. KVKK ve GDPR kapsamındaki bilgi alma, düzeltme ve silme haklarını bu yolla
+          kullanabilirsin.
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

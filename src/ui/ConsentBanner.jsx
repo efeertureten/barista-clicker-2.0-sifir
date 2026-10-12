@@ -14,9 +14,17 @@ export default function ConsentBanner({ onAccept, onDecline }) {
           Oyunu birlikte geliştirelim mi?
         </h2>
         <p id="bc-consent-text" className="mt-1.5 text-[13px] leading-snug text-[var(--roast)]">
-          Hangi seviyeye ulaştığın ya da hangi yükseltmeyi aldığın gibi oynanış verilerini toplamak istiyoruz. Adın ya
-          da e-postan gibi kişisel bilgiler toplanmaz. Kararını alttaki &ldquo;Veri izni&rdquo; bağlantısından
-          değiştirebilirsin.
+          Hangi seviyeye ulaştığın, hangi yükseltmeyi aldığın gibi oynanış verilerini Google Analytics ile toplamak
+          istiyoruz. Adın ya da e-postan toplanmaz. Kararını alttaki &ldquo;Veri izni&rdquo; bağlantısından
+          değiştirebilirsin.{' '}
+          <a
+            href="./gizlilik.html"
+            target="_blank"
+            rel="noopener"
+            className="font-semibold text-[var(--crema-deep)] underline underline-offset-2 hover:text-[var(--ink)]"
+          >
+            Ayrıntılar
+          </a>
         </p>
         <div className="mt-3 flex gap-2">
           <button

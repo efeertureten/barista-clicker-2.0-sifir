@@ -94,16 +94,14 @@ Oyun dengesini değiştirmek için yalnızca `src/game/config.js` dosyasına dok
 
 ## Ölçüm
 
-Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek için oynanış olaylarını Firebase Analytics'e gönderebilir. Varsayılan olarak kapalıdır.
+Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek için oynanış olaylarını Google Analytics for Firebase'e (proje `barista-7c17e`) gönderir; ama yalnızca oyuncu izin verirse.
 
-- `src/analytics/firebaseConfig.js` boşken hiçbir yere veri gitmez, veri izni de sorulmaz.
-- Yapılandırma girildiğinde oyuncuya ilk tıklamadan sonra köşede bir izin bandı çıkar. "Kabul et" demeden hiçbir olay gönderilmez; o ana kadar biriken olaylar kabul edilirse gönderilir, reddedilirse silinir. Karar, alttaki "Veri izni" bağlantısından her zaman değiştirilebilir.
-- Firebase kütüphanesi ayrı bir parça olarak yalnızca izin verildiğinde indirilir; izin vermeyen oyuncunun yükleme süresi değişmez.
-- Ad, e-posta gibi kişisel bilgi toplanmaz.
+- Oyuncuya ilk tıklamadan sonra köşede bir izin bandı çıkar. "Kabul et" demeden hiçbir olay gönderilmez; o ana kadar biriken olaylar kabul edilirse gönderilir, reddedilirse silinir. Karar, alttaki "Veri izni" bağlantısından her zaman değiştirilebilir; izin geri çekilince Google Analytics çerezleri de silinir.
+- Firebase kütüphanesi ayrı bir parça olarak yalnızca izin verildiğinde indirilir; izin vermeyen oyuncunun tarayıcısı Google'a hiç istek göndermez.
+- Ad, e-posta gibi bilgiler toplanmaz. Oyunculara yönelik açıklama [`public/gizlilik.html`](public/gizlilik.html) sayfasında, izin bandından bağlantı var.
+- `src/analytics/firebaseConfig.js` içindeki yapılandırma `null` yapılırsa ölçüm tamamen kapanır ve izin de sorulmaz. Bu değerler gizli değildir, her ziyaretçinin tarayıcısına zaten gönderilir.
 
-**Firebase'i bağlamak:** [Firebase konsolunda](https://console.firebase.google.com/) bir proje aç, Google Analytics'i etkinleştir, projeye bir web uygulaması ekle ve verilen `firebaseConfig` nesnesini `src/analytics/firebaseConfig.js` dosyasına yapıştır. Bu değerler gizli değildir, her ziyaretçinin tarayıcısına zaten gönderilir.
-
-**Hata ayıklama:** adrese `?debug=1` eklenince olaylar Firebase olmadan da tarayıcı konsoluna `[ölçüm]` önekiyle yazılır ve `window.__bcAnalytics` listesinde birikir. `?debug=0` kapatır.
+**Hata ayıklama:** adrese `?debug=1` eklenince bu tarayıcının olayları Firebase konsolundaki DebugView'da canlı görünür, ayrıca tarayıcı konsoluna `[ölçüm]` önekiyle yazılır ve `window.__bcAnalytics` listesinde birikir. `?debug=0` kapatır.
 
 | Olay | Ne zaman | Başlıca bilgiler |
 |---|---|---|
