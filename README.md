@@ -11,6 +11,8 @@ Kahve demle, sat, dükkânını seyyar tezgâhtan kahve imparatorluğuna büyüt
 
 ## Nasıl oynanır
 
+Yeni oyuncuyu bir rehber karşılar ve ilk dakikada döngünün dört parçasından geçirir: latteye dokun, ilk yükseltmeyi al, ilk üreticiyi al (oyuncu yokken de kazanmanın ön koşulu), Köşe Kafe'ye ulaş. Rehber oyunun durumuna bakarak ilerler; sayfa yenilense de, adımlar farklı sırayla yapılsa da doğru yerden devam eder ve istenirse geçilebilir. Geniş ekranda fincanın altında, telefonda ekranın altında durur.
+
 - Latteye tıkla, her tıklama kahve demler ve kasaya para koyar.
 - Marketten yükseltme al: tık başına daha çok kahve ya da sen tıklamazken çalışan otomatik üretim.
 - Toplam demlenen fincan sayısı arttıkça dükkânın büyür, büyüdükçe fincan başına satış fiyatı da artar ve markette yeni bir üretici açılır.
@@ -87,7 +89,8 @@ src/
     content.js           yükseltme ve dükkân adları, açıklamaları, görselleri
     economy.js           saf oyun mantığı: tık, üretim, satın alma, seviye, kilometre taşları
     save.js              oyun kaydını okuma, doğrulama, eski kayıtları taşıma ve yazma
-    meta.js              kurulum tarihi, oturum sayısı, oyun süresi, ilk deneyim adımları
+    meta.js              kurulum tarihi, oturum sayısı, oyun süresi, ilk deneyim adımları, rehber grubu
+    tutorial.js          rehberin adımları (oyun durumundan türetilir) ve A/B grubu ataması
     format.js            sayı ve para biçimleri
   audio/
     soundEngine.js       Web Audio ses motoru (efekt ve müzik kanalları, müzik kısma)
@@ -96,7 +99,7 @@ src/
     analytics.js         ölçüm katmanı: izin, olay sırası, Firebase ve hata ayıklama çıkışı
     remoteConfig.js      Remote Config'ten "economy" parametresini indirir ve saklar
     firebaseConfig.js    Firebase yapılandırması (boşken hiçbir yere veri gitmez)
-  ui/                    stiller, market kartları, ses düğmesi, veri izni bandı, Hoş geldin kartı
+  ui/                    stiller, market kartları, rehber, ses düğmesi, veri izni bandı, Hoş geldin kartı
   lib/                   localStorage ve dosya yolu yardımcıları
   barista-assets/        oyun görselleri (WebP)
   barista-sounds/        oyun sesleri (MP3)
@@ -129,6 +132,12 @@ Oyunun bütün sayıları Firebase Remote Config'teki tek bir **`economy`** para
 - Remote Config de yalnızca veri iznini veren oyuncularda çalışır; diğerleri varsayılan dengeyle oynar.
 - Parametreyi silmek her şeyi varsayılana döndürür.
 
+## Rehber A/B testi
+
+Strateji belgesindeki 1 numaralı test: rehberli ilk dakika D1'i artırıyor mu? Yeni oyuncuların hangi payının rehberi göreceği `src/game/config.js` içindeki `tutorial.share` değeriyle belirlenir: `1` herkes (kapalı beta için varsayılan), `0.5` yarı yarıya. Grup oyuncunun cihazında kurulum anında bir kez atanır ve `tutorial_variant` oyuncu özelliğiyle ölçüme gider; iki grubun D1'i Firebase'de bu özelliğe göre karşılaştırılır.
+
+Bu oran Remote Config'ten değil koddan değiştirilir: web'de veri izni ilk tıktan sonra sorulduğu için Remote Config yeni bir oyuncuya ilk açılışta ulaşamaz.
+
 ## Ölçüm
 
 Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek için oynanış olaylarını Google Analytics for Firebase'e (proje `barista-7c17e`) gönderir; ama yalnızca oyuncu izin verirse.
@@ -143,7 +152,10 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | Olay | Ne zaman | Başlıca bilgiler |
 |---|---|---|
 | `session_begin` | oyun açıldığında ya da 30 dakikadan uzun aradan sonra sekmeye dönüldüğünde | oturum numarası, kurulumdan beri geçen gün, kaç dakika uzak kalındığı, dükkân seviyesi |
-| `ftue_step` | ilk deneyim adımları, her biri bir kez: `first_brew`, `first_purchase`, `first_level_up` | adım adı ve sırası |
+| `ftue_step` | ilk deneyim adımları, her biri bir kez (rehberli ve rehbersiz oyuncularda): `first_brew` 1, `first_purchase` 2, `first_producer` 3, `first_level_up` 4 | adım adı ve numarası |
+| `tutorial_begin` | rehber grubundaki yeni oyuncu oyunu ilk açtığında | grup |
+| `tutorial_complete` | rehberin dört adımı bitince | rehberin başlangıcından beri geçen saniye, oturum numarası |
+| `tutorial_skip` | "Rehberi geç"e basıldığında | hangi adımda geçildiği |
 | `level_up` | dükkân büyüdüğünde | yeni seviye ve adı, toplam aktif oyun dakikası |
 | `spend_virtual_currency` | yükseltme alındığında | yükseltme, ödenen tutar, alımdan sonraki adet, dükkân seviyesi |
 | `settings_change` | ses ya da müzik açılıp kapatıldığında | ayar ve yeni değeri |
@@ -153,7 +165,7 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `game_reset` | oyun sıfırlandığında | sıfırlamadan önceki seviye, fincan ve tık sayısı |
 | `app_error` | yakalanmamış bir hata olduğunda | hata türü ve kısa mesajı |
 
-Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `economy_version` (oyuncunun hangi dengeyle oynadığı), `max_shop_level`, `sound`, `music`. Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
+Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `economy_version` (oyuncunun hangi dengeyle oynadığı), `tutorial_variant` (`guide` rehberli, `control` rehbersiz, `none` rehberden önce başlamış), `max_shop_level`, `sound`, `music`. Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
 
 ## Görseller ve sesler
 

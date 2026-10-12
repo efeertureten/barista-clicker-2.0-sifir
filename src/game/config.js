@@ -2,7 +2,7 @@
 // uzaktan değiştirebilir (bkz. mergeConfig); bu yüzden içinde metin ya da görsel yok, yalnızca sayılar var.
 // Metinler ve görseller content.js'te, bu sayılarla birleştirilerek kullanılır.
 
-export const APP_VERSION = '2.1.0';
+export const APP_VERSION = '2.2.0';
 
 export const DEFAULT_CONFIG = {
   // Ölçümde hangi dengeyle oynandığını ayırt etmek için (oyuncu özelliği: economy_version)
@@ -44,6 +44,13 @@ export const DEFAULT_CONFIG = {
     efficiency: 0.5,
     capSeconds: 2 * 3600,
     minSeconds: 60,
+  },
+
+  // İlk deneyim rehberi. share: yeni oyuncuların rehberi gören payı (1 = herkes, 0.5 = A/B testi).
+  // Grup kurulumda cihazda belirlenir ve değişmez. Web'de Remote Config yeni oyuncuya ilk açılışta ulaşamaz
+  // (izin ilk tıktan sonra sorulur), bu yüzden bu testin oranı şimdilik burada, kodda değiştirilir.
+  tutorial: {
+    share: 1,
   },
 };
 
@@ -131,6 +138,12 @@ export function mergeConfig(base, override) {
     });
     take('offline.minSeconds', o.minSeconds, (v) => isNum(v, 0, 600), (v) => {
       config.offline.minSeconds = v;
+    });
+  }
+
+  if (override.tutorial && typeof override.tutorial === 'object') {
+    take('tutorial.share', override.tutorial.share, (v) => isNum(v, 0, 1), (v) => {
+      config.tutorial.share = v;
     });
   }
 

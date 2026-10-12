@@ -21,17 +21,37 @@ const dayNumber = (ts) => {
 function readMeta(now, hadSave) {
   const saved = readJSON(META_KEY);
   if (saved && typeof saved === 'object' && Number.isFinite(saved.installedAt)) {
-    return { sessions: 0, lastSeenAt: 0, activeSeconds: 0, ftue: {}, ...saved };
+    return { meta: { sessions: 0, lastSeenAt: 0, activeSeconds: 0, ftue: {}, ...saved }, fresh: false };
   }
   // Ölçümden önce oynamaya başlamış oyuncunun gerçek kurulum tarihini bilemeyiz; "eski oyuncu" diye işaretlenir
-  return { installedAt: now, sessions: 0, lastSeenAt: 0, activeSeconds: 0, ftue: {}, legacy: Boolean(hadSave) };
+  return {
+    meta: { installedAt: now, sessions: 0, lastSeenAt: 0, activeSeconds: 0, ftue: {}, legacy: Boolean(hadSave) },
+    fresh: true,
+  };
 }
 
 export function createMeta({ hadSave }) {
-  const meta = readMeta(Date.now(), hadSave);
+  const { meta, fresh } = readMeta(Date.now(), hadSave);
   const persist = () => writeJSON(META_KEY, meta);
 
   return {
+    // Bu açılışta ilk kez oluşturuldu ve oyun kaydı da yoktu: gerçekten yeni bir oyuncu
+    isNewPlayer: fresh && !hadSave,
+
+    // Rehber: { variant: guide|control|none, status: active|done|skipped|off, startedAt }
+    // İlk çağrıda grup belirlenir ve kaydedilir; sonraki açılışlarda aynısı döner.
+    tutorial(assign) {
+      if (meta.tutorial) return { ...meta.tutorial, justAssigned: false };
+      const variant = assign();
+      meta.tutorial = { variant, status: variant === 'guide' ? 'active' : 'off', startedAt: Date.now() };
+      persist();
+      return { ...meta.tutorial, justAssigned: true };
+    },
+    setTutorialStatus(status) {
+      if (!meta.tutorial) return;
+      meta.tutorial.status = status;
+      persist();
+    },
     // Oyun açıldığında ve sekmeye geri dönüldüğünde çağrılır
     touchSession(now = Date.now()) {
       const away = meta.lastSeenAt ? now - meta.lastSeenAt : null;

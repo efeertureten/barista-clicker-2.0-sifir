@@ -1,9 +1,10 @@
 import React from 'react';
 
-// Veri izni bandı: oyunu kapatmaz, köşede durur. Yalnızca ölçüm hedefi tanımlıyken ve ilk tıklamadan sonra çıkar.
+// Veri izni bandı: oyunu kapatmaz, kenarda durur. Yalnızca ölçüm hedefi tanımlıyken ve ilk tıklamadan sonra çıkar.
 export default function ConsentBanner({ onAccept, onDecline }) {
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] sm:justify-start sm:px-6 sm:pb-6">
+    // Telefonda ve tablette üstte durur: alt kenar rehbere ve fincana ayrılmış. Geniş ekranda sol altta.
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center px-4 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] lg:bottom-0 lg:top-auto lg:justify-start lg:px-6 lg:pb-6 lg:pt-0">
       <section
         role="dialog"
         aria-labelledby="bc-consent-title"

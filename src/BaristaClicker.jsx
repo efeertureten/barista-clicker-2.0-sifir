@@ -21,6 +21,7 @@ import { buildShops, buildUpgrades } from './game/content.js';
 import { createEconomy } from './game/economy.js';
 import { hasSave, loadSave, readLastActiveAt, writeSave } from './game/save.js';
 import { createMeta } from './game/meta.js';
+import { assignTutorialVariant, currentTutorialStep, TUTORIAL_STEPS } from './game/tutorial.js';
 import { fmt, fmtMoney, fmtPercent, fmtPrice, fmtRate } from './game/format.js';
 import { createSoundEngine } from './audio/soundEngine.js';
 import { MUSIC_PREF_KEY, MUSIC_TRACK, SOUND_PREF_KEY, SOUNDS } from './audio/sounds.js';
@@ -30,6 +31,7 @@ import AudioToggle from './ui/AudioToggle.jsx';
 import ConsentBanner from './ui/ConsentBanner.jsx';
 import WelcomeBack from './ui/WelcomeBack.jsx';
 import { LockedUpgradeCard, UpgradeCard } from './ui/UpgradeCard.jsx';
+import TutorialGuide, { TutorialDone } from './ui/TutorialGuide.jsx';
 
 // Büyük sahne görseli yalnızca dikey yer olduğunda (geniş ekranda yan yana düzen ya da uzun ekran) görünür;
 // diğer durumlarda dükkan adının yanında küçük resim gösterilir, böylece fincan ekranın altına itilmez.
@@ -72,6 +74,9 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
   const [musicOn, setMusicOn] = useState(() => readPref(MUSIC_PREF_KEY));
   const [consent, setConsentState] = useState(null);
   const [consentOpen, setConsentOpen] = useState(false);
+  // Rehber: { variant, status, startedAt } (meta'dan) · tutorialDone: bitiş kartı açık mı
+  const [tutorial, setTutorial] = useState(null);
+  const [tutorialDone, setTutorialDone] = useState(false);
 
   const stateRef = useRef(state);
   const onSaveRef = useRef(onSave);
@@ -125,7 +130,16 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       });
     };
     beginSession();
+
+    // Rehber grubu: yeni oyuncuya kurulumda bir kez atanır (A/B testi için rehberli ya da rehbersiz)
+    const assigned = meta.tutorial(() =>
+      assignTutorialVariant({ isNewPlayer: meta.isNewPlayer, share: config.tutorial.share }),
+    );
+    setTutorial(assigned);
+    if (assigned.justAssigned && assigned.variant === 'guide') analytics.track('tutorial_begin', { variant: 'guide' });
+
     analytics.setUserProperties({
+      tutorial_variant: assigned.variant,
       install_cohort: meta.installCohort,
       app_version: APP_VERSION,
       economy_version: config.version,
@@ -260,7 +274,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
         session_number: metaRef.current?.sessionNumber,
       });
       analytics.setUserProperties({ max_shop_level: shopIndex + 1 });
-      if (shopIndex === 1) markFtue('first_level_up', 3);
+      if (prev === 0) markFtue('first_level_up', 4);
       // Bu büyümeyle markette açılan yeni üreticiler
       const unlocked = UPGRADES.filter((u) => u.unlockLevel > prev + 1 && u.unlockLevel <= shopIndex + 1);
       const reached = SHOPS[shopIndex];
@@ -363,6 +377,8 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       shop_level: shopIndex + 1,
     });
     markFtue('first_purchase', 2);
+    // İlk üretici: artık oyuncu yokken de kazanıyor (çevrimdışı kazancın ve geri dönüşün ön koşulu)
+    if (economy.isProducer(upgrade.id) && economy.cpsOf(state.owned) === 0) markFtue('first_producer', 3);
 
     // Kilometre taşı: bu alımla üreticinin üretimi katlandı
     if (economy.isProducer(upgrade.id) && config.milestones.includes(ownedAfter)) {
@@ -405,6 +421,102 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     });
   };
 
+  /* ---------------- İlk deneyim rehberi ---------------- */
+  const tutorialStep = tutorial?.status === 'active' ? currentTutorialStep(state, economy) : null;
+
+  // Bütün adımlar tamam: bitiş kartı ve ölçüm
+  useEffect(() => {
+    if (tutorial?.status !== 'active' || tutorialStep !== null) return;
+    metaRef.current?.setTutorialStatus('done');
+    setTutorial((t) => ({ ...t, status: 'done' }));
+    setTutorialDone(true);
+    analytics.track('tutorial_complete', {
+      seconds: Math.round((Date.now() - tutorial.startedAt) / 1000),
+      session_number: metaRef.current?.sessionNumber,
+    });
+  }, [tutorial, tutorialStep]);
+
+  // Bitiş kartı 12 sn sonra kendiliğinden kapanır
+  useEffect(() => {
+    if (!tutorialDone) return undefined;
+    const t = setTimeout(() => setTutorialDone(false), 12000);
+    return () => clearTimeout(t);
+  }, [tutorialDone]);
+
+  const skipTutorial = () => {
+    analytics.track('tutorial_skip', { step: tutorialStep, step_number: TUTORIAL_STEPS.indexOf(tutorialStep) + 1 });
+    metaRef.current?.setTutorialStatus('skipped');
+    setTutorial((t) => ({ ...t, status: 'skipped' }));
+  };
+
+  // Telefonda market sayfanın aşağısında: rehber hedef karta ya da fincana kaydırır
+  const scrollToId = (id) =>
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // Fincan ekranda mı (alttaki rehber şeridinin kapladığı yer hariç)? Değilse rehber "Latteye dön" önerir.
+  const [cupInView, setCupInView] = useState(true);
+  useEffect(() => {
+    const el = cupWrapRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(([entry]) => setCupInView(entry.intersectionRatio >= 0.6), {
+      threshold: [0, 0.6, 1],
+      rootMargin: '0px 0px -200px 0px',
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  // Rehber başlarken dar ekranda fincanı ortala: alttaki şerit fincanı örtmesin
+  const centeredForGuide = useRef(false);
+  useEffect(() => {
+    if (tutorialStep !== 'brew' || centeredForGuide.current) return;
+    centeredForGuide.current = true;
+    if (window.innerWidth < 1024) scrollToId('bc-cup');
+  }, [tutorialStep]);
+  const backToCup = cupInView ? null : { label: 'Latteye dön', direction: 'up', onClick: () => scrollToId('bc-cup') };
+
+  const guideTarget = tutorialStep === 'buy' ? 'beans' : tutorialStep === 'producer' ? 'machine' : null;
+  const guide = (() => {
+    if (!tutorialStep) return null;
+    const index = TUTORIAL_STEPS.indexOf(tutorialStep);
+    const base = { index, total: TUTORIAL_STEPS.length };
+    if (tutorialStep === 'brew') {
+      return {
+        ...base,
+        title: 'Latteye dokun',
+        text: 'Her dokunuş bir fincan kahve demler. Fincanı satarsın, para kasaya girer.',
+        action: backToCup,
+      };
+    }
+    if (guideTarget) {
+      const target = UPGRADES.find((u) => u.id === guideTarget);
+      const cost = economy.costOf(target.id, state.owned);
+      const ready = state.money >= cost;
+      const why =
+        guideTarget === 'beans'
+          ? 'Her dokunuşta bir fincan daha demlersin.'
+          : 'Sen dokunmasan da, oyundan çıksan da kahve demler.';
+      return {
+        ...base,
+        title: ready ? `${target.name} al` : `${fmtMoney(cost)} biriktir`,
+        text: ready ? `Marketteki parlayan karta dokun. ${why}` : `Sonra marketten ${target.name} al. ${why}`,
+        progress: ready ? null : { value: state.money, max: cost, label: `${fmtMoney(state.money)} / ${fmtMoney(cost)}` },
+        action: ready
+          ? { label: 'Markette göster', direction: 'down', onClick: () => scrollToId(`upgrade-${guideTarget}`) }
+          : backToCup,
+      };
+    }
+    const goal = SHOPS[1];
+    return {
+      ...base,
+      title: `${fmt(goal.at)} fincana ulaş`,
+      text: `Dükkanın büyür: ${goal.name}. Fincan fiyatı ${fmtPrice(goal.price)} olur, markette yeni bir üretici açılır.`,
+      progress: { value: state.coffees, max: goal.at, label: `${fmt(state.coffees)} / ${fmt(goal.at)} fincan` },
+      action: backToCup,
+    };
+  })();
+  const pace = config.offline.efficiency === 0.5 ? 'yarım hızla' : `${fmtPercent(config.offline.efficiency)} hızla`;
+
   const handleReset = () => {
     if (!confirmReset) {
       setConfirmReset(true);
@@ -421,7 +533,9 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       lang="tr"
       onPointerDown={unlockAudio}
       onKeyDown={unlockAudio}
-      className="bc-root flex min-h-full w-full flex-col bg-[var(--foam)] text-[var(--ink)] lg:grid lg:h-full lg:grid-cols-[minmax(0,1fr)_400px]"
+      className={`bc-root flex min-h-full w-full flex-col bg-[var(--foam)] text-[var(--ink)] lg:grid lg:h-full lg:grid-cols-[minmax(0,1fr)_400px] ${
+        guide || tutorialDone ? 'pb-56 lg:pb-0' : ''
+      }`}
     >
       <style>{STYLES}</style>
 
@@ -544,7 +658,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
           </section>
 
           <div className="flex flex-1 flex-col items-center justify-center gap-6 py-4 lg:py-0">
-            <div ref={cupWrapRef} className="relative">
+            <div ref={cupWrapRef} id="bc-cup" className="relative scroll-mt-24">
               <button
                 type="button"
                 onClick={handleBrew}
@@ -552,6 +666,12 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                 className="bc-cup relative grid h-64 w-64 select-none place-items-center rounded-full transition-transform duration-100 ease-out hover:scale-[1.03] active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--crema)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--foam)] sm:h-72 sm:w-72 lg:[@media(max-height:820px)]:h-56 lg:[@media(max-height:820px)]:w-56"
               >
                 <span aria-hidden="true" className="bc-glow pointer-events-none absolute -inset-12 rounded-full" />
+                {tutorialStep === 'brew' && (
+                  <span
+                    aria-hidden="true"
+                    className="bc-hint pointer-events-none absolute -inset-1 rounded-full border-4 border-[var(--crema)]"
+                  />
+                )}
                 {bump > 0 && (
                   <span
                     key={bump}
@@ -601,7 +721,15 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
               ))}
             </div>
 
-            <div className="text-center">
+            {/* Geniş ekranda rehber bu alanda durur; telefonda alta sabitlenir ve bu yazı yerinde kalır */}
+            {guide && <TutorialGuide guide={guide} onSkip={skipTutorial} />}
+            {!guide && tutorialDone && (
+              <TutorialDone
+                text={`Makinelerin sen yokken de ${pace} çalışır; geri geldiğinde birikeni toplarsın. Her yeni dükkanda markette yeni bir üretici açılır.`}
+                onClose={() => setTutorialDone(false)}
+              />
+            )}
+            <div className={`text-center ${guide || tutorialDone ? 'lg:hidden' : ''}`}>
               <p className="bc-display text-2xl font-extrabold sm:text-3xl">Demle, sat, büyü.</p>
               <p className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-[var(--roast)]">
                 <MousePointerClick size={16} strokeWidth={2} aria-hidden="true" />
@@ -686,6 +814,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                       ? `+${fmtRate(economy.unitCpsOf(upgrade.id, state.owned))} kahve / sn`
                       : `+${fmt(upgrade.perClick)} kahve / tık`
                   }
+                  highlight={guideTarget === upgrade.id}
                   milestone={
                     producer
                       ? {

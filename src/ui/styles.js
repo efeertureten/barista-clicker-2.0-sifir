@@ -64,9 +64,15 @@ export const STYLES = `
 @keyframes bc-scene-in { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
 @keyframes bc-pop { 0% { transform: scale(0.82); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
 .bc-rise { animation: bc-rise 0.45s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
+/* Rehber: dokunulacak yeri gösteren nabız halkası ve parlayan market kartı */
+.bc-hint { animation: bc-hint 1.6s ease-out infinite; }
+@keyframes bc-hint { 0% { transform: scale(0.96); opacity: 0.85; } 100% { transform: scale(1.22); opacity: 0; } }
+.bc-guide-card { box-shadow: 0 0 0 2px var(--crema), 0 0 0 6px rgba(208, 146, 74, 0.18); animation: bc-guide-glow 1.6s ease-in-out infinite; }
+@keyframes bc-guide-glow { 50% { box-shadow: 0 0 0 2px var(--crema), 0 0 0 10px rgba(208, 146, 74, 0.06); } }
 @keyframes bc-rise { from { opacity: 0; transform: translateY(24px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (prefers-reduced-motion: reduce) {
-  .bc-bob, .bc-ring, .bc-toast, .bc-scene-in, .bc-pop, .bc-rise { animation: none; }
+  .bc-bob, .bc-ring, .bc-toast, .bc-scene-in, .bc-pop, .bc-rise, .bc-guide-card { animation: none; }
+  .bc-hint { animation: none; opacity: 0.7; transform: scale(1.06); }
   .bc-bean { display: none; }
   .bc-float { animation: bc-fade 0.9s ease-out forwards; }
 }

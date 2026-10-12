@@ -35,15 +35,19 @@ function UpgradeArt({ upgrade, active }) {
 
 // Satın alınabilir (ya da para biriktirilen) yükseltme kartı.
 // milestone: { next, prev, multiplier, step } yalnızca üreticilerde; next null ise bütün hedefler tamam.
-export function UpgradeCard({ upgrade, owned, cost, affordable, progress, effect, milestone, onBuy }) {
+// highlight: rehber bu kartı gösteriyor
+export function UpgradeCard({ upgrade, owned, cost, affordable, progress, effect, milestone, highlight, onBuy }) {
   const showMilestone = milestone && owned > 0;
   return (
     <button
       type="button"
+      id={`upgrade-${upgrade.id}`}
       disabled={!affordable}
       onClick={onBuy}
       aria-label={`${upgrade.name} satın al, ${fmtMoney(cost)}. Sahip olunan: ${owned}`}
-      className="group relative w-full overflow-hidden rounded-2xl border border-[var(--line-dark)] bg-[var(--espresso-2)] p-4 text-left transition duration-150 enabled:hover:border-[var(--crema)] enabled:hover:bg-[var(--espresso-3)] enabled:active:scale-[0.985] disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)]"
+      className={`group relative w-full scroll-mt-4 overflow-hidden rounded-2xl border border-[var(--line-dark)] bg-[var(--espresso-2)] p-4 text-left transition duration-150 enabled:hover:border-[var(--crema)] enabled:hover:bg-[var(--espresso-3)] enabled:active:scale-[0.985] disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)] ${
+        highlight ? 'bc-guide-card border-[var(--crema)]' : ''
+      }`}
     >
       <div className="flex items-start gap-3">
         <span
