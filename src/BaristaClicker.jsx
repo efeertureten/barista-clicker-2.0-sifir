@@ -17,7 +17,7 @@ import { src } from './lib/asset.js';
 import { readPref, writePref } from './lib/storage.js';
 import { APP_VERSION } from './game/config.js';
 import { loadActiveConfig } from './game/activeConfig.js';
-import { buildShops, buildUpgrades } from './game/content.js';
+import { buildShops, buildUpgrades, districtOf } from './game/content.js';
 import { createEconomy } from './game/economy.js';
 import { hasSave, loadSave, readLastActiveAt, writeSave } from './game/save.js';
 import { createMeta } from './game/meta.js';
@@ -33,6 +33,7 @@ import WelcomeBack from './ui/WelcomeBack.jsx';
 import { LockedUpgradeCard, UpgradeCard } from './ui/UpgradeCard.jsx';
 import TutorialGuide, { TutorialDone } from './ui/TutorialGuide.jsx';
 import MarketShortcut from './ui/MarketShortcut.jsx';
+import { BranchModal, BranchPanel } from './ui/Branch.jsx';
 
 // Büyük sahne görseli yalnızca dikey yer olduğunda (geniş ekranda yan yana düzen ya da uzun ekran) görünür;
 // diğer durumlarda dükkan adının yanında küçük resim gösterilir, böylece fincan ekranın altına itilmez.
@@ -78,6 +79,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
   // Rehber: { variant, status, startedAt } (meta'dan) · tutorialDone: bitiş kartı açık mı
   const [tutorial, setTutorial] = useState(null);
   const [tutorialDone, setTutorialDone] = useState(false);
+  const [branchOpen, setBranchOpen] = useState(false);
 
   const stateRef = useRef(state);
   const onSaveRef = useRef(onSave);
@@ -98,8 +100,10 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
   const shopIndex = economy.levelOf(state);
   const shop = SHOPS[shopIndex];
   const nextShop = SHOPS[shopIndex + 1];
-  const perClick = economy.perClickOf(state.owned);
-  const cps = economy.cpsOf(state.owned);
+  // İtibar çarpanı dahil (Yeni Şube)
+  const boost = economy.boostOf(state);
+  const perClick = economy.perClickFor(state);
+  const cps = economy.cpsFor(state);
   // Seviye hiç düşmediği için fincan sayısı o dükkanın eşiğinin altında kalabilir (eski kayıt, yeni denge)
   const shopProgress = nextShop
     ? Math.min(1, Math.max(0, (state.coffees - shop.at) / (nextShop.at - shop.at)))
@@ -286,8 +290,6 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
         image: reached.thumb,
         tint: reached.tint,
       });
-    } else if (shopIndex < prev) {
-      setToast(null);
     }
     // Yalnızca seviye değişince çalışır; içerideki sesler ve ölçüm her seferinde güncel değerleri okur
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -540,6 +542,62 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
   })();
   const pace = config.offline.efficiency === 0.5 ? 'yarım hızla' : `${fmtPercent(config.offline.efficiency)} hızla`;
 
+  /* ---------------- Yeni Şube ---------------- */
+  const branchInfo = economy.branchUnlocked(state)
+    ? (() => {
+        const gain = economy.reputationGainOf(state);
+        return {
+          district: districtOf(state.branches + 1),
+          gain,
+          boostNow: boost,
+          boostAfter: 1 + config.prestige.perPoint * (state.reputation + gain),
+          coffees: state.coffees,
+          gainAt: economy.coffeesForGain(gain),
+          nextAt: economy.coffeesForGain(gain + 1),
+          firstAt: economy.coffeesForGain(1),
+        };
+      })()
+    : null;
+
+  const openBranch = () => {
+    if (!economy.canOpenBranch(state)) return;
+    analytics.track('prestige_view', { reputation_gain: branchInfo.gain, reputation: state.reputation, branch: state.branches });
+    setBranchOpen(true);
+  };
+
+  const confirmBranch = () => {
+    if (!economy.canOpenBranch(state)) return;
+    const gain = economy.reputationGainOf(state);
+    const reputation = state.reputation + gain;
+    const branch = state.branches + 1;
+    const district = districtOf(branch);
+    unlockAudio();
+    dispatch({ type: 'newBranch' });
+    setBranchOpen(false);
+    setFloaters([]);
+    soundRef.current?.duckMusic(5.5);
+    sfx('bell', { maxVoices: 1 });
+    sfx('levelUp', { delay: 0.3, maxVoices: 1 });
+    showToast({
+      key: `branch-${branch}`,
+      title: `Yeni şube: ${district}`,
+      subtitle: `İtibar ${fmt(reputation)} · üretim ve tık gücü ×${fmtRate(1 + config.prestige.perPoint * reputation)}`,
+      image: SHOPS[0].thumb,
+      tint: SHOPS[0].tint,
+    });
+    analytics.track('prestige', {
+      reputation_gain: gain,
+      reputation,
+      branch,
+      district,
+      coffees: Math.round(state.coffees),
+      minutes_played: metaRef.current?.activeMinutes,
+      session_number: metaRef.current?.sessionNumber,
+    });
+    analytics.setUserProperties({ branches: branch, reputation });
+    window.scrollTo?.({ top: 0, behavior: 'smooth' });
+  };
+
   const handleReset = () => {
     if (!confirmReset) {
       setConfirmReset(true);
@@ -548,6 +606,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     analytics.track('game_reset', { shop_level: shopIndex + 1, coffees: Math.round(state.coffees), clicks: state.clicks });
     setConfirmReset(false);
     setFloaters([]);
+    setToast(null);
     dispatch({ type: 'reset' });
   };
 
@@ -603,8 +662,11 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                     />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-                      Dükkanın
+                    <p className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                      {districtOf(state.branches) ? `${districtOf(state.branches)} şubesi` : 'Dükkanın'}
+                      {state.reputation > 0 && (
+                        <span className="text-[var(--crema-deep)]"> · itibar ×{fmtRate(boost)}</span>
+                      )}
                     </p>
                     <p className="bc-display truncate text-lg font-extrabold leading-tight">{shop.name}</p>
                   </div>
@@ -647,7 +709,8 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                 </div>
               </dl>
 
-              <div className="mt-4">
+              {branchInfo && <BranchPanel info={branchInfo} onOpen={openBranch} />}
+              <div className={`mt-4 ${branchInfo ? 'hidden' : ''}`}>
                 <div className="flex items-baseline justify-between gap-3 text-xs">
                   <span className="font-semibold text-[var(--roast)]">
                     {nextShop ? `Sonraki dükkan: ${nextShop.name}` : 'En büyük dükkana ulaştın'}
@@ -674,6 +737,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                 {nextShop && (
                   <p className="mt-2 text-xs text-[var(--muted)]">
                     Büyüyünce fincan fiyatı {fmtPrice(shop.price)} → {fmtPrice(nextShop.price)}
+                    {shopIndex + 2 === config.prestige.unlockLevel && ' · orada yeni şube açabilirsin'}
                   </p>
                 )}
               </div>
@@ -738,7 +802,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                     className="bc-float bc-mono pointer-events-none absolute whitespace-nowrap rounded-full bg-[var(--milk)] px-2.5 py-0.5 text-lg font-semibold text-[var(--crema-deep)] shadow-[0_6px_14px_-6px_rgba(43,26,17,0.45)]"
                     style={{ left: f.textX, top: f.y }}
                   >
-                    +{fmt(f.amount)}
+                    +{fmtRate(f.amount)}
                   </span>
                 </React.Fragment>
               ))}
@@ -757,7 +821,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
               <p className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-[var(--roast)]">
                 <MousePointerClick size={16} strokeWidth={2} aria-hidden="true" />
                 <span>
-                  Tık başına <strong className="bc-mono font-semibold text-[var(--ink)]">+{fmt(perClick)}</strong> kahve
+                  Tık başına <strong className="bc-mono font-semibold text-[var(--ink)]">+{fmtRate(perClick)}</strong> kahve
                 </span>
                 <span aria-hidden="true">·</span>
                 <span>
@@ -821,7 +885,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                     key={upgrade.id}
                     upgrade={upgrade}
                     shopName={SHOPS[upgrade.unlockLevel - 1].name}
-                    cps={upgrade.cps ?? 0}
+                    cps={(upgrade.cps ?? 0) * boost}
                   />
                 );
               }
@@ -839,8 +903,8 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                   progress={Math.min(1, state.money / cost)}
                   effect={
                     producer
-                      ? `+${fmtRate(economy.unitCpsOf(upgrade.id, state.owned))} kahve / sn`
-                      : `+${fmt(upgrade.perClick)} kahve / tık`
+                      ? `+${fmtRate(economy.unitCpsOf(upgrade.id, state.owned) * boost)} kahve / sn`
+                      : `+${fmtRate(upgrade.perClick * boost)} kahve / tık`
                   }
                   highlight={guideTarget === upgrade.id}
                   milestone={
@@ -915,6 +979,16 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       {/* ---------------- Telefonda market kısayolu (rehber açıkken rehberin kendi düğmeleri var) ---------------- */}
       {!guide && !tutorialDone && (
         <MarketShortcut affordable={affordableCount} inMarket={inMarket} onClick={handleShortcut} />
+      )}
+
+      {/* ---------------- Yeni şube onayı ---------------- */}
+      {branchOpen && branchInfo && branchInfo.gain >= 1 && (
+        <BranchModal
+          info={branchInfo}
+          reputation={state.reputation}
+          onConfirm={confirmBranch}
+          onCancel={() => setBranchOpen(false)}
+        />
       )}
 
       {/* ---------------- Hoş geldin: uzaktayken biriken üretim ---------------- */}

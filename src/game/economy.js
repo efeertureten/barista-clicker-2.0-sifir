@@ -16,13 +16,17 @@ export const INITIAL_STATE = {
   // Ulaşılan en yüksek dükkan seviyesi (0'dan başlar). Fincan sayısından hesaplanır ama hiç düşmez:
   // eşikler değişse bile (yeni denge, Remote Config) oyuncu kazandığı dükkanı kaybetmez.
   level: 0,
+  // Yeni Şube (prestij): itibar puanı (her puan üretimi ve tık gücünü artırır) ve açılmış şube sayısı.
+  // Yeni şube açılınca bu ikisi dışında şubeye ait her şey sıfırlanır.
+  reputation: 0,
+  branches: 1,
   // Uzaktayken biriken, henüz toplanmamış üretim:
   // { coffees, seconds (depoya sayılan süre), away (gerçek uzak kalma süresi), capped (depo doldu mu) }
   offline: null,
 };
 
 export function createEconomy(config) {
-  const { shops, upgrades, costGrowth, offline, milestones, milestoneMultiplier } = config;
+  const { shops, upgrades, costGrowth, offline, milestones, milestoneMultiplier, prestige } = config;
 
   // Yalnızca fincan sayısına göre seviye
   const levelFromCoffees = (coffees) => {
@@ -48,6 +52,18 @@ export function createEconomy(config) {
   const cpsOf = (owned) => UPGRADE_IDS.reduce((sum, id) => sum + unitCpsOf(id, owned) * (owned[id] ?? 0), 0);
   const costOf = (id, owned) => Math.ceil(upgrades[id].baseCost * costGrowth ** (owned[id] ?? 0));
 
+  // İtibar çarpanı: puan başına prestige.perPoint (0.1 = %10) daha fazla üretim ve tık gücü
+  const boostOf = (state) => 1 + prestige.perPoint * (state.reputation ?? 0);
+  const perClickFor = (state) => perClickOf(state.owned) * boostOf(state);
+  const cpsFor = (state) => cpsOf(state.owned) * boostOf(state);
+
+  // Yeni Şube: bu şubede demlenen fincana göre kazanılacak itibar = küp kök(fincan / bölen)
+  const reputationGainOf = (state) => Math.floor(Math.cbrt(Math.max(0, state.coffees) / prestige.divisor));
+  const branchUnlocked = (state) => levelOf(state) + 1 >= prestige.unlockLevel;
+  const canOpenBranch = (state) => branchUnlocked(state) && reputationGainOf(state) >= 1;
+  // Bir sonraki itibar puanı için bu şubede gereken toplam fincan
+  const coffeesForGain = (gain) => gain ** 3 * prestige.divisor;
+
   function produce(state, amount) {
     if (amount <= 0) return state;
     const level = levelOf(state);
@@ -65,16 +81,16 @@ export function createEconomy(config) {
   function reducer(state, action) {
     switch (action.type) {
       case 'click':
-        return { ...produce(state, perClickOf(state.owned)), clicks: state.clicks + 1 };
+        return { ...produce(state, perClickFor(state)), clicks: state.clicks + 1 };
       case 'tick':
-        return produce(state, cpsOf(state.owned) * action.dt);
+        return produce(state, cpsFor(state) * action.dt);
       // Oyuncu action.seconds boyunca uzaktaydı: üretimin bir kısmı depoda birikir, depo dolunca durur.
       // Toplanmamış birikim varsa üstüne eklenir; depo sınırı ikisinin toplamına uygulanır.
       case 'away': {
         const prev = state.offline;
         const stored = prev?.seconds ?? 0;
         const seconds = Math.min(action.seconds, Math.max(0, offline.capSeconds - stored));
-        const coffees = cpsOf(state.owned) * offline.efficiency * seconds;
+        const coffees = cpsFor(state) * offline.efficiency * seconds;
         if (coffees <= 0 && !prev) return state;
         return {
           ...state,
@@ -101,6 +117,18 @@ export function createEconomy(config) {
           owned: { ...state.owned, [action.id]: (state.owned[action.id] ?? 0) + 1 },
         };
       }
+      // Yeni şube: itibar kazanılır; para, fincan, yükseltmeler ve dükkan seviyesi sıfırlanır.
+      // Toplam kazanç ve tık sayısı oyuncunun ömür boyu istatistiği olarak kalır.
+      case 'newBranch': {
+        if (!canOpenBranch(state) || state.offline) return state;
+        return {
+          ...INITIAL_STATE,
+          clicks: state.clicks,
+          earned: state.earned,
+          reputation: (state.reputation ?? 0) + reputationGainOf(state),
+          branches: (state.branches ?? 1) + 1,
+        };
+      }
       case 'reset':
         return INITIAL_STATE;
       default:
@@ -119,6 +147,13 @@ export function createEconomy(config) {
     unitCpsOf,
     cpsOf,
     costOf,
+    boostOf,
+    perClickFor,
+    cpsFor,
+    reputationGainOf,
+    branchUnlocked,
+    canOpenBranch,
+    coffeesForGain,
     reducer,
   };
 }

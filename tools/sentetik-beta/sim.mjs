@@ -50,22 +50,9 @@ function scenarioConfig() {
 }
 const BASE_CONFIG = scenarioConfig();
 const GUIDE_SHARE = FLAGS.has('guideAll') ? 1 : FLAGS.has('noGuide') ? 0 : 0.5;
-const PRESTIGE = FLAGS.has('prestige') ? { unlockLevel: 5, div: 8e8, perPoint: 0.1 } : null;
+const PRESTIGE = FLAGS.has('prestige'); // oyuncular Yeni Şube'yi kullanır (oyunun gerçek kodu)
 // market: telefonda sabit market kısayolu → telefon oyuncusu marketi masaüstündeki kadar çabuk fark eder
 const MARKET_BUTTON = FLAGS.has('market');
-
-// Yeni Şube bonusu: üretim ve tık gücü (1 + 0.1 × itibar) katı. Gerçek kodda yok; senaryo için denge ölçeklenir.
-function scaledConfig(rep) {
-  if (!rep) return BASE_CONFIG;
-  const k = 1 + PRESTIGE.perPoint * rep;
-  const upgrades = Object.fromEntries(
-    Object.entries(BASE_CONFIG.upgrades).map(([id, u]) => [
-      id,
-      'perClick' in u ? { ...u, perClick: u.perClick * k } : { ...u, cps: u.cps * k },
-    ]),
-  );
-  return { ...BASE_CONFIG, upgrades };
-}
 
 /* ---------------- davranış varsayımları ---------------- */
 // Oyuncu tipleri: payı, tıklama hızı (tık/sn), oturumda tıklayarak geçen pay, günlük oturum, oturum süresi (dk, medyan),
@@ -168,9 +155,8 @@ function simulatePlayer(i) {
   const discoverLater = disc(); // sonraki oturumlarda fark etme
   const buyR = stream(i, 5);
 
-  let rep = 0;
-  let config = scaledConfig(0);
-  let economy = createEconomy(config);
+  const config = BASE_CONFIG;
+  const economy = createEconomy(config);
   let state = INITIAL_STATE;
   const dispatch = (action) => {
     state = economy.reducer(state, action);
@@ -362,18 +348,16 @@ function simulatePlayer(i) {
       if (t === len - 1 && stayForGuide && tutorial === 'active' && len < s.len + 150) len += 1;
     }
 
-    // ---- Yeni Şube (senaryo) ----
+    // ---- Yeni Şube (senaryo): oyunun gerçek newBranch işlemi; oyuncu itibarını en az ikiye katlayacaksa
+    // ya da en az 5 puan kazanacaksa açar ----
     let prestigedNow = false;
-    if (PRESTIGE && playerLevel() >= PRESTIGE.unlockLevel) {
-      const gain = Math.floor(Math.cbrt(state.coffees / PRESTIGE.div));
-      if (gain >= Math.max(5, rep)) {
-        rep += gain;
+    if (PRESTIGE && economy.branchUnlocked(state)) {
+      const gain = economy.reputationGainOf(state);
+      if (gain >= Math.max(5, state.reputation) && !state.offline) {
+        dispatch({ type: 'newBranch' });
         prestiges += 1;
         prestigedNow = true;
-        emit(p, s.start + len, 'prestige', { reputation_gain: gain, reputation: rep, branch: prestiges + 1 });
-        config = scaledConfig(rep);
-        economy = createEconomy(config);
-        state = { ...INITIAL_STATE };
+        emit(p, s.start + len, 'prestige', { reputation_gain: gain, reputation: state.reputation, branch: state.branches });
         boredomActive = 0;
       }
     }

@@ -12,7 +12,7 @@ pip install pandas numpy
 python3 analyze.py runs analysis                       # analysis/results.json
 ```
 
-Senaryo bayrakları: `prestige` (Yeni Şube, simülasyon katmanında), `guideAll` / `noGuide`, `cap4` / `cap8` (çevrimdışı depo), `grow200` (Köşe Kafe eşiği), `market` (telefonda market kısayolu). Aynı oyuncu numarası her senaryoda aynı kişidir (aynı tip, cihaz, takvim ve rastgele kararlar); senaryolar arasındaki fark yalnızca oyundan gelir.
+Senaryo bayrakları: `prestige` (oyuncular Yeni Şube'yi oyunun gerçek koduyla kullanır; itibarını en az ikiye katlayacak ya da en az 5 puan kazanacaksa açar), `guideAll` / `noGuide`, `cap4` / `cap8` (çevrimdışı depo), `grow200` (Köşe Kafe eşiği), `market` (telefonda market kısayolu). Aynı oyuncu numarası her senaryoda aynı kişidir (aynı tip, cihaz, takvim ve rastgele kararlar); senaryolar arasındaki fark yalnızca oyundan gelir.
 
 Duyarlılık: `--urge 2` (kısa deponun oyuncuyu geri çağırma etkisini 2 katına çıkarır), `--caploss 0` (dolu depoda hissedilen kaybı kapatır), `--tag ad` (çıktı dosya adına ek).
 

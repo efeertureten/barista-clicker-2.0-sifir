@@ -37,6 +37,8 @@ export function loadSave(initialSave) {
     clicks: Math.floor(num(save.clicks)),
     owned: Object.fromEntries(UPGRADE_IDS.map((id) => [id, Math.floor(num(save.owned?.[id]))])),
     level: loadLevel(save),
+    reputation: Math.floor(num(save.reputation)),
+    branches: Math.max(1, Math.floor(num(save.branches))),
     offline: loadOffline(save.offline),
   };
 }

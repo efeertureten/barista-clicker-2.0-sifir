@@ -2,7 +2,7 @@
 // uzaktan değiştirebilir (bkz. mergeConfig); bu yüzden içinde metin ya da görsel yok, yalnızca sayılar var.
 // Metinler ve görseller content.js'te, bu sayılarla birleştirilerek kullanılır.
 
-export const APP_VERSION = '2.2.1';
+export const APP_VERSION = '2.3.0';
 
 export const DEFAULT_CONFIG = {
   // Ölçümde hangi dengeyle oynandığını ayırt etmek için (oyuncu özelliği: economy_version)
@@ -46,6 +46,14 @@ export const DEFAULT_CONFIG = {
     efficiency: 0.5,
     capSeconds: 4 * 3600,
     minSeconds: 60,
+  },
+
+  // Yeni Şube (prestij): unlockLevel. dükkan seviyesine ulaşınca açılır; itibar = küp kök(bu şubedeki fincan / divisor);
+  // her itibar puanı üretimi ve tık gücünü perPoint kadar artırır. Değerler sentetik betada sınandı (D14 %3,9 → %7,0).
+  prestige: {
+    unlockLevel: 6,
+    divisor: 800_000_000,
+    perPoint: 0.1,
   },
 
   // İlk deneyim rehberi. share: yeni oyuncuların rehberi gören payı (1 = herkes, 0.5 = A/B testi).
@@ -141,6 +149,19 @@ export function mergeConfig(base, override) {
     });
     take('offline.minSeconds', o.minSeconds, (v) => isNum(v, 0, 600), (v) => {
       config.offline.minSeconds = v;
+    });
+  }
+
+  if (override.prestige && typeof override.prestige === 'object') {
+    const o = override.prestige;
+    take('prestige.unlockLevel', o.unlockLevel, (v) => isInt(v, 2, levels), (v) => {
+      config.prestige.unlockLevel = v;
+    });
+    take('prestige.divisor', o.divisor, (v) => isNum(v, 1, 1e18), (v) => {
+      config.prestige.divisor = v;
+    });
+    take('prestige.perPoint', o.perPoint, (v) => isNum(v, 0, 1), (v) => {
+      config.prestige.perPoint = v;
     });
   }
 

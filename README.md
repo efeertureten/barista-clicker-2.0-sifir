@@ -17,6 +17,7 @@ Yeni oyuncuyu bir rehber karşılar ve ilk dakikada döngünün dört parçasın
 - Marketten yükseltme al: tık başına daha çok kahve ya da sen tıklamazken çalışan otomatik üretim.
 - Toplam demlenen fincan sayısı arttıkça dükkânın büyür, büyüdükçe fincan başına satış fiyatı da artar ve markette yeni bir üretici açılır.
 - Bir üreticiden 25, 50, 100, 150, 200 ve 300 adete ulaştığında o üreticinin üretimi her seferinde 2 katına çıkar.
+- Kahve İmparatorluğu'na ulaşınca **Yeni Şube** açabilirsin: başka bir semtte (Kadıköy, Balat, Beşiktaş…) seyyar tezgâhla yeniden başlarsın ama itibar kazanırsın. İtibar = küp kök(bu şubede demlenen fincan / 800 milyon); her puan üretimi ve tık gücünü %10 artırır. Kasa, fincanlar, yükseltmeler ve dükkân seviyesi sıfırlanır; itibar, toplam kazanç ve tık sayısı kalır. Şubeyi ne kadar geç açarsan o kadar çok itibar kazanırsın.
 - Sen yokken de dükkân yarım hızla çalışır. Kazanç en çok 4 saat birikir; döndüğünde "Hoş geldin" kartından kasaya toplarsın. Bir dakikadan kısa ayrılıklar sayılmaz, üretim tam hızla devam eder.
 - İlerleme tarayıcıda otomatik kaydedilir.
 
@@ -86,8 +87,8 @@ src/
   game/
     config.js            ayarlanabilir bütün denge değerleri ve Remote Config doğrulaması (mergeConfig)
     activeConfig.js      bu oturumun dengesi: varsayılan + Remote Config'ten en son gelen
-    content.js           yükseltme ve dükkân adları, açıklamaları, görselleri
-    economy.js           saf oyun mantığı: tık, üretim, satın alma, seviye, kilometre taşları
+    content.js           yükseltme ve dükkân adları, açıklamaları, görselleri; şube semtleri
+    economy.js           saf oyun mantığı: tık, üretim, satın alma, seviye, kilometre taşları, Yeni Şube
     save.js              oyun kaydını okuma, doğrulama, eski kayıtları taşıma ve yazma
     meta.js              kurulum tarihi, oturum sayısı, oyun süresi, ilk deneyim adımları, rehber grubu
     tutorial.js          rehberin adımları (oyun durumundan türetilir) ve A/B grubu ataması
@@ -99,7 +100,7 @@ src/
     analytics.js         ölçüm katmanı: izin, olay sırası, Firebase ve hata ayıklama çıkışı
     remoteConfig.js      Remote Config'ten "economy" parametresini indirir ve saklar
     firebaseConfig.js    Firebase yapılandırması (boşken hiçbir yere veri gitmez)
-  ui/                    stiller, market kartları ve kısayolu, rehber, ses düğmesi, veri izni bandı, Hoş geldin kartı
+  ui/                    stiller, market kartları ve kısayolu, rehber, Yeni Şube paneli ve onayı, ses düğmesi, veri izni bandı, Hoş geldin kartı
   lib/                   localStorage ve dosya yolu yardımcıları
   barista-assets/        oyun görselleri (WebP)
   barista-sounds/        oyun sesleri (MP3)
@@ -140,7 +141,7 @@ Oyunun bütün sayıları Firebase Remote Config'teki tek bir **`economy`** para
 - **Telefonda market kısayolu:** rehbersiz telefon oyuncularının yarısı marketi ilk oturumda bulamıyordu. Telefonda ve tablette sağ altta sabit bir düğme markete götürür (alınabilir yükseltme sayısıyla), marketteyken latteye döndürür.
 - **Çevrimdışı depo 4 saat:** 2 saatlik depo dönüşlerin %61'inde doluydu; 4 saat hiçbir varsayımda 2 saatin gerisinde kalmadı.
 - **Rehber herkeste:** market kısayoluyla rehberin ek etkisi küçüldü, A/B testi için gereken örneklem çok büyüdü. Grup ataması kodda duruyor: `tutorial.share` değeri (`1` herkes, `0.5` yarı yarıya) ile yeniden açılabilir; grup kurulumda cihazda atanır ve `tutorial_variant` özelliğiyle ölçüme gider. Bu oran Remote Config'ten değil koddan değişir, çünkü web'de veri izni ilk tıktan sonra sorulduğu için Remote Config yeni oyuncuya ilk açılışta ulaşamaz.
-- **Sıradaki büyük iş Yeni Şube:** içerik bağlı oyuncular için 3. günde bitiyor; prestij D14 tutulmasını neredeyse ikiye katlıyor.
+- **Yeni Şube (2.3):** içerik bağlı oyuncular için 3. günde bitiyordu; Yeni Şube ile sentetik oyuncularda D14 tutulması %4,4'ten %8,4'e çıkıyor (4 saatlik depoyla birlikte).
 
 ## Ölçüm
 
@@ -160,6 +161,8 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `tutorial_begin` | rehber grubundaki yeni oyuncu oyunu ilk açtığında | grup |
 | `tutorial_complete` | rehberin dört adımı bitince | rehberin başlangıcından beri geçen saniye, oturum numarası |
 | `tutorial_skip` | "Rehberi geç"e basıldığında | hangi adımda geçildiği |
+| `prestige_view` | Yeni Şube onay penceresi açıldığında | kazanılacak itibar, mevcut itibar, şube numarası |
+| `prestige` | yeni şube açıldığında | kazanılan ve toplam itibar, şube numarası, semt, şubede demlenen fincan, aktif oyun dakikası |
 | `market_shortcut` | telefondaki market kısayoluna basıldığında | yön (`market` / `cup`), alınabilir yükseltme sayısı |
 | `level_up` | dükkân büyüdüğünde | yeni seviye ve adı, toplam aktif oyun dakikası |
 | `spend_virtual_currency` | yükseltme alındığında | yükseltme, ödenen tutar, alımdan sonraki adet, dükkân seviyesi |
@@ -170,7 +173,7 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `game_reset` | oyun sıfırlandığında | sıfırlamadan önceki seviye, fincan ve tık sayısı |
 | `app_error` | yakalanmamış bir hata olduğunda | hata türü ve kısa mesajı |
 
-Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `economy_version` (oyuncunun hangi dengeyle oynadığı), `tutorial_variant` (`guide` rehberli, `control` rehbersiz, `none` rehberden önce başlamış), `max_shop_level`, `sound`, `music`. Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
+Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `economy_version` (oyuncunun hangi dengeyle oynadığı), `tutorial_variant` (`guide` rehberli, `control` rehbersiz, `none` rehberden önce başlamış), `max_shop_level`, `branches`, `reputation`, `sound`, `music`. Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
 
 ## Görseller ve sesler
 

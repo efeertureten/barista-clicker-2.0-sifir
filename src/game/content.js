@@ -108,3 +108,12 @@ export function buildUpgrades(config) {
 export function buildShops(config) {
   return config.shops.map((balance, i) => ({ ...SHOP_CONTENT[i], ...balance }));
 }
+
+// Yeni şubelerin açıldığı semtler, sırayla. İlk dükkanın semti yok; 2. şube Kadıköy'de açılır.
+export const DISTRICTS = ['Kadıköy', 'Balat', 'Beşiktaş', 'Moda', 'Cihangir', 'Üsküdar', 'Karaköy', 'Kuzguncuk', 'Arnavutköy', 'Bebek', 'Fener', 'Nişantaşı'];
+
+// branch: şube numarası (1 = ilk dükkan). Liste bitince "N. şube" olarak devam eder.
+export function districtOf(branch) {
+  if (branch <= 1) return null;
+  return DISTRICTS[branch - 2] ?? `${branch}. şube`;
+}
