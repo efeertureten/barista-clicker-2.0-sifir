@@ -18,6 +18,7 @@ Yeni oyuncuyu bir rehber karşılar ve ilk dakikada döngünün dört parçasın
 - Toplam demlenen fincan sayısı arttıkça dükkânın büyür, büyüdükçe fincan başına satış fiyatı da artar ve markette yeni bir üretici açılır.
 - Bir üreticiden 25, 50, 100, 150, 200 ve 300 adete ulaştığında o üreticinin üretimi her seferinde 2 katına çıkar.
 - Kahve İmparatorluğu'na ulaşınca **Yeni Şube** açabilirsin: başka bir semtte (Kadıköy, Balat, Beşiktaş…) seyyar tezgâhla yeniden başlarsın ama itibar kazanırsın. İtibar = küp kök(bu şubede demlenen fincan / 800 milyon); her puan üretimi ve tık gücünü %10 artırır. Kasa, fincanlar, yükseltmeler ve dükkân seviyesi sıfırlanır; itibar, toplam kazanç ve tık sayısı kalır. Şubeyi ne kadar geç açarsan o kadar çok itibar kazanırsın.
+- Her gün 3 **sipariş** gelir ("250 kez latteye dokun", "X fincan demle", "8 yükseltme al", "Hoş geldin kartından topla"); hedefler o anki gücüne göre ölçeklenir. Her teslim para ve 1 **Altın Çekirdek** verir, üçü birden +2 daha. Sipariş teslim ettiğin her gün **seriye** eklenir; kaçırdığın günü dondurma hakkı karşılar (2 hak, her 7 günde biri geri gelir), 3, 7, 14 ve 30. günlerde ek Altın Çekirdek var. Altın Çekirdeği **hızlı demlemeye** harcarsın: 5 Altın Çekirdeğe 1 saatlik üretim. Siparişler gece yarısı yenilenir; geri sayım yok.
 - Sen yokken de dükkân yarım hızla çalışır. Kazanç en çok 4 saat birikir; döndüğünde "Hoş geldin" kartından kasaya toplarsın. Bir dakikadan kısa ayrılıklar sayılmaz, üretim tam hızla devam eder.
 - İlerleme tarayıcıda otomatik kaydedilir.
 
@@ -92,6 +93,7 @@ src/
     save.js              oyun kaydını okuma, doğrulama, eski kayıtları taşıma ve yazma
     meta.js              kurulum tarihi, oturum sayısı, oyun süresi, ilk deneyim adımları, rehber grubu
     tutorial.js          rehberin adımları (oyun durumundan türetilir) ve A/B grubu ataması
+    orders.js            günlük siparişler, seri ve dondurma hakları
     format.js            sayı ve para biçimleri
   audio/
     soundEngine.js       Web Audio ses motoru (efekt ve müzik kanalları, müzik kısma)
@@ -100,7 +102,7 @@ src/
     analytics.js         ölçüm katmanı: izin, olay sırası, Firebase ve hata ayıklama çıkışı
     remoteConfig.js      Remote Config'ten "economy" parametresini indirir ve saklar
     firebaseConfig.js    Firebase yapılandırması (boşken hiçbir yere veri gitmez)
-  ui/                    stiller, market kartları ve kısayolu, rehber, Yeni Şube paneli ve onayı, ses düğmesi, veri izni bandı, Hoş geldin kartı
+  ui/                    stiller, market kartları ve kısayolu, rehber, günün siparişleri, Yeni Şube paneli ve onayı, ses düğmesi, veri izni bandı, Hoş geldin kartı
   lib/                   localStorage ve dosya yolu yardımcıları
   barista-assets/        oyun görselleri (WebP)
   barista-sounds/        oyun sesleri (MP3)
@@ -141,6 +143,7 @@ Oyunun bütün sayıları Firebase Remote Config'teki tek bir **`economy`** para
 - **Telefonda market kısayolu:** rehbersiz telefon oyuncularının yarısı marketi ilk oturumda bulamıyordu. Telefonda ve tablette sağ altta sabit bir düğme markete götürür (alınabilir yükseltme sayısıyla), marketteyken latteye döndürür.
 - **Çevrimdışı depo 4 saat:** 2 saatlik depo dönüşlerin %61'inde doluydu; 4 saat hiçbir varsayımda 2 saatin gerisinde kalmadı.
 - **Rehber herkeste:** market kısayoluyla rehberin ek etkisi küçüldü, A/B testi için gereken örneklem çok büyüdü. Grup ataması kodda duruyor: `tutorial.share` değeri (`1` herkes, `0.5` yarı yarıya) ile yeniden açılabilir; grup kurulumda cihazda atanır ve `tutorial_variant` özelliğiyle ölçüme gider. Bu oran Remote Config'ten değil koddan değişir, çünkü web'de veri izni ilk tıktan sonra sorulduğu için Remote Config yeni oyuncuya ilk açılışta ulaşamaz.
+- **Günlük siparişler (2.4):** önce sentetik betada sınandı. İlk ayar fazla kolaydı (gündelik oyuncuların %98'i her gün üçünü bitiriyordu) ve ilerlemeyi %23 hızlandırıyordu; hedefler yükseltilip ödüller azaltıldı. Seçilen ayarda gündelik oyuncuların %93'ü, bir kez deneyenlerin %65'i günü tamamlıyor; D7'ye katkı varsayıma göre +1,1 ile +4,0 puan arası.
 - **Yeni Şube (2.3):** içerik bağlı oyuncular için 3. günde bitiyordu; Yeni Şube ile sentetik oyuncularda D14 tutulması %4,4'ten %8,4'e çıkıyor (4 saatlik depoyla birlikte).
 
 ## Ölçüm
@@ -163,9 +166,13 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `tutorial_skip` | "Rehberi geç"e basıldığında | hangi adımda geçildiği |
 | `prestige_view` | Yeni Şube onay penceresi açıldığında | kazanılacak itibar, mevcut itibar, şube numarası |
 | `prestige` | yeni şube açıldığında | kazanılan ve toplam itibar, şube numarası, semt, şubede demlenen fincan, aktif oyun dakikası |
+| `daily_order_complete` | sipariş teslim edildiğinde | tür, hedef, bugün teslim edilen sayı, seri, dükkân seviyesi |
+| `daily_bonus` | üç sipariş de teslim edilip bonus alındığında | seri |
+| `streak_update` | günün ilk teslimi seriyi ilerlettiğinde | seri, kullanılan dondurma hakkı, seri sıfırlandı mı |
+| `earn_virtual_currency` | Altın Çekirdek kazanıldığında (GA4 önerilen olay) | `Altın Çekirdek`, miktar, kaynak (`order`, `daily_bonus`, `streak`) |
 | `market_shortcut` | telefondaki market kısayoluna basıldığında | yön (`market` / `cup`), alınabilir yükseltme sayısı |
 | `level_up` | dükkân büyüdüğünde | yeni seviye ve adı, toplam aktif oyun dakikası |
-| `spend_virtual_currency` | yükseltme alındığında | yükseltme, ödenen tutar, alımdan sonraki adet, dükkân seviyesi |
+| `spend_virtual_currency` | yükseltme alındığında ya da Altın Çekirdek harcandığında | para birimi, tutar, ne alındığı (`instant_brew` = hızlı demleme), alımdan sonraki adet, dükkân seviyesi |
 | `settings_change` | ses ya da müzik açılıp kapatıldığında | ayar ve yeni değeri |
 | `milestone_reached` | bir üretici kilometre taşına ulaştığında | üretici, adet, yeni çarpan, dükkân seviyesi |
 | `config_rejected` | Remote Config'teki bazı alanlar geçersiz olduğu için atlandığında | atlanan alanlar |

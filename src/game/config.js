@@ -2,7 +2,7 @@
 // uzaktan değiştirebilir (bkz. mergeConfig); bu yüzden içinde metin ya da görsel yok, yalnızca sayılar var.
 // Metinler ve görseller content.js'te, bu sayılarla birleştirilerek kullanılır.
 
-export const APP_VERSION = '2.3.0';
+export const APP_VERSION = '2.4.0';
 
 export const DEFAULT_CONFIG = {
   // Ölçümde hangi dengeyle oynandığını ayırt etmek için (oyuncu özelliği: economy_version)
@@ -54,6 +54,32 @@ export const DEFAULT_CONFIG = {
     unlockLevel: 6,
     divisor: 800_000_000,
     perPoint: 0.1,
+  },
+
+  // Günlük siparişler (orders.js). Hedefler sipariş üretildiğinde oyuncunun gücüne göre ölçeklenir:
+  // brew = saniyede üretim × brewSeconds + tık gücü × brewTaps; ödül parası = saniyelik gelir × rewardSeconds.
+  // Altın Çekirdek: sipariş başına goldPerOrder, üçü birden goldAllBonus, seri günlerinde streakRewards.
+  // instantHours / instantCost: "Hızlı demleme" ile bu kadar saatlik üretimi hemen alma ve fiyatı.
+  // Değerler sentetik betada seçildi: gündelik oyuncuların %93'ü normal bir günde üçünü bitirebiliyor
+  // (turistlerde %65); ödüller ilerlemeyi %16 hızlandırıyor (daha cömert ayar %23'tü).
+  orders: {
+    perDay: 3,
+    tapTarget: 250,
+    brewSeconds: 600,
+    brewTaps: 200,
+    buyTarget: 8,
+    rewardSeconds: 300,
+    goldPerOrder: 1,
+    goldAllBonus: 2,
+    streakRewards: [
+      { day: 3, gold: 3 },
+      { day: 7, gold: 5 },
+      { day: 14, gold: 10 },
+      { day: 30, gold: 20 },
+    ],
+    freezesMax: 2,
+    instantHours: 1,
+    instantCost: 5,
   },
 
   // İlk deneyim rehberi. share: yeni oyuncuların rehberi gören payı (1 = herkes, 0.5 = A/B testi).
@@ -162,6 +188,28 @@ export function mergeConfig(base, override) {
     });
     take('prestige.perPoint', o.perPoint, (v) => isNum(v, 0, 1), (v) => {
       config.prestige.perPoint = v;
+    });
+  }
+
+  if (override.orders && typeof override.orders === 'object') {
+    const o = override.orders;
+    const fields = {
+      perDay: (v) => isInt(v, 1, 4),
+      tapTarget: (v) => isInt(v, 10, 10_000),
+      brewSeconds: (v) => isNum(v, 10, 36_000),
+      brewTaps: (v) => isNum(v, 0, 10_000),
+      buyTarget: (v) => isInt(v, 1, 100),
+      rewardSeconds: (v) => isNum(v, 0, 86_400),
+      goldPerOrder: (v) => isInt(v, 0, 100),
+      goldAllBonus: (v) => isInt(v, 0, 100),
+      freezesMax: (v) => isInt(v, 0, 10),
+      instantHours: (v) => isNum(v, 0.25, 24),
+      instantCost: (v) => isInt(v, 1, 1000),
+    };
+    Object.entries(fields).forEach(([key, ok]) => {
+      take(`orders.${key}`, o[key], ok, (v) => {
+        config.orders[key] = v;
+      });
     });
   }
 

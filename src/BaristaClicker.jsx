@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
+  Flame,
   MousePointerClick,
   Music,
   RotateCcw,
@@ -9,6 +10,7 @@ import {
   Volume2,
   VolumeX,
   Wallet,
+  Zap,
 } from 'lucide-react';
 
 import cupImg from './barista-assets/cup.webp';
@@ -34,6 +36,8 @@ import { LockedUpgradeCard, UpgradeCard } from './ui/UpgradeCard.jsx';
 import TutorialGuide, { TutorialDone } from './ui/TutorialGuide.jsx';
 import MarketShortcut from './ui/MarketShortcut.jsx';
 import { BranchModal, BranchPanel } from './ui/Branch.jsx';
+import DailyOrders from './ui/DailyOrders.jsx';
+import { advanceStreak, dayKeyOf, streakAlive } from './game/orders.js';
 
 // Büyük sahne görseli yalnızca dikey yer olduğunda (geniş ekranda yan yana düzen ya da uzun ekran) görünür;
 // diğer durumlarda dükkan adının yanında küçük resim gösterilir, böylece fincan ekranın altına itilmez.
@@ -196,6 +200,21 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     }, 100);
     return () => clearInterval(id);
   }, [minAwaySeconds]);
+
+  // Günlük siparişler: takvim günü değişince (açılışta, gece yarısında, sekmeye dönünce) yeni siparişler
+  useEffect(() => {
+    const check = () => {
+      const day = dayKeyOf();
+      if (stateRef.current.daily?.day !== day) dispatch({ type: 'newDay', day });
+    };
+    check();
+    const id = setInterval(check, 30_000);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, []);
 
   // Otomatik kayıt
   useEffect(() => {
@@ -542,6 +561,73 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
   })();
   const pace = config.offline.efficiency === 0.5 ? 'yarım hızla' : `${fmtPercent(config.offline.efficiency)} hızla`;
 
+  /* ---------------- Günlük siparişler ---------------- */
+  const GOLD = 'Altın Çekirdek';
+  const claimOrder = (index) => {
+    const daily = state.daily;
+    const order = daily?.orders[index];
+    if (!order || order.claimed || order.progress < order.target) return;
+    unlockAudio();
+    const firstToday = !daily.orders.some((o) => o.claimed);
+    const s = firstToday ? advanceStreak(state.streak, daily.day, config.orders) : null;
+    dispatch({ type: 'claimOrder', index });
+    sfx('ting', { maxVoices: 2 });
+    sfx('drip', { delay: 0.1, maxVoices: 2 });
+    const streakNow = s ? s.streak.count : state.streak.count;
+    analytics.track('daily_order_complete', {
+      type: order.type,
+      target: order.target,
+      orders_done_today: daily.orders.filter((o) => o.claimed).length + 1,
+      streak: streakNow,
+      shop_level: shopIndex + 1,
+    });
+    analytics.track('earn_virtual_currency', { virtual_currency_name: GOLD, value: order.gold, source: 'order' });
+    if (s) {
+      analytics.track('streak_update', { streak: streakNow, used_freezes: s.usedFreezes, reset: s.reset });
+      if (s.gold) analytics.track('earn_virtual_currency', { virtual_currency_name: GOLD, value: s.gold, source: 'streak' });
+      if (s.milestone || s.usedFreezes) {
+        showToast({
+          key: `streak-${daily.day}`,
+          title: s.milestone ? `Seri ${streakNow} gün!` : `Seri ${streakNow} gün, dondurma hakkıyla korundu`,
+          subtitle: s.milestone
+            ? `+${s.gold} ${GOLD}${streakNow % 7 === 0 ? ' · +1 dondurma hakkı' : ''}`
+            : `${s.usedFreezes} hak kullanıldı, ${s.streak.freezes} kaldı`,
+          icon: Flame,
+        });
+      }
+    }
+  };
+
+  const claimDailyBonus = () => {
+    if (!state.daily || state.daily.bonusClaimed || !state.daily.orders.every((o) => o.claimed)) return;
+    unlockAudio();
+    dispatch({ type: 'claimBonus' });
+    sfx('ting', { maxVoices: 2 });
+    sfx('ting', { delay: 0.2, maxVoices: 2 });
+    analytics.track('daily_bonus', { streak: state.streak.count });
+    analytics.track('earn_virtual_currency', { virtual_currency_name: GOLD, value: config.orders.goldAllBonus, source: 'daily_bonus' });
+  };
+
+  const instantBrew = () => {
+    const cost = config.orders.instantCost;
+    if (state.gold < cost || cps <= 0) return;
+    unlockAudio();
+    const coffees = cps * config.orders.instantHours * 3600;
+    dispatch({ type: 'instantBrew' });
+    sfx('buyMachine', { maxVoices: 1 });
+    sfx('ting', { delay: 0.25, maxVoices: 2 });
+    showToast({
+      key: `instant-${Date.now()}`,
+      title: `Hızlı demleme: +${fmt(coffees)} fincan`,
+      subtitle: `${fmt(config.orders.instantHours)} saatlik üretim · −${cost} ${GOLD}`,
+      icon: Zap,
+    });
+    analytics.track('spend_virtual_currency', { virtual_currency_name: GOLD, value: cost, item_name: 'instant_brew', shop_level: shopIndex + 1 });
+  };
+
+  // Rehber sürerken siparişler gizli (ilk dakika tek bir hedefe odaklansın); ilerleme yine de sayılır
+  const showOrders = Boolean(state.daily) && tutorial !== null && tutorial.status !== 'active' && !tutorialDone;
+
   /* ---------------- Yeni Şube ---------------- */
   const branchInfo = economy.branchUnlocked(state)
     ? (() => {
@@ -829,6 +915,19 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                 </span>
               </p>
             </div>
+            {showOrders && (
+              <DailyOrders
+                daily={state.daily}
+                gold={state.gold}
+                streak={state.streak}
+                streakAlive={streakAlive(state.streak, state.daily.day)}
+                cfg={config.orders}
+                canInstant={state.gold >= config.orders.instantCost && cps > 0}
+                onClaim={claimOrder}
+                onBonus={claimDailyBonus}
+                onInstant={instantBrew}
+              />
+            )}
           </div>
         </div>
 

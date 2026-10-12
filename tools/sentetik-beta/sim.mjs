@@ -46,13 +46,31 @@ function scenarioConfig() {
   if (FLAGS.has('cap4')) over = { ...over, offline: { capSeconds: 4 * 3600 } };
   if (FLAGS.has('cap8')) over = { ...over, offline: { capSeconds: 8 * 3600 } };
   if (FLAGS.has('grow200')) over = { ...over, shops: DEFAULT_CONFIG.shops.map((s, i) => (i === 1 ? { ...s, at: 200 } : s)) };
-  return mergeConfig(DEFAULT_CONFIG, over).config;
+  // --set yol=değer,yol=değer: denge değerlerini dene, örn. --set orders.tapTarget=200,orders.rewardSeconds=300
+  const setArg = process.argv.indexOf('--set');
+  if (setArg > 0) {
+    process.argv[setArg + 1].split(',').forEach((pair) => {
+      const [key, value] = pair.split('=');
+      const parts = key.split('.');
+      let node = over;
+      parts.slice(0, -1).forEach((k) => {
+        node[k] = { ...(node[k] ?? {}) };
+        node = node[k];
+      });
+      node[parts.at(-1)] = Number(value);
+    });
+  }
+  const { config, rejected } = mergeConfig(DEFAULT_CONFIG, over);
+  if (rejected.length) throw new Error(`geçersiz --set alanları: ${rejected.join(', ')}`);
+  return config;
 }
 const BASE_CONFIG = scenarioConfig();
 const GUIDE_SHARE = FLAGS.has('guideAll') ? 1 : FLAGS.has('noGuide') ? 0 : 0.5;
 const PRESTIGE = FLAGS.has('prestige'); // oyuncular Yeni Şube'yi kullanır (oyunun gerçek kodu)
 // market: telefonda sabit market kısayolu → telefon oyuncusu marketi masaüstündeki kadar çabuk fark eder
 const MARKET_BUTTON = FLAGS.has('market');
+// orders: günlük siparişler (oyunun gerçek kodu): oyuncu tamamlananı teslim eder, Altın Çekirdeği hızlı demlemeye harcar
+const ORDERS = FLAGS.has('orders');
 
 /* ---------------- davranış varsayımları ---------------- */
 // Oyuncu tipleri: payı, tıklama hızı (tık/sn), oturumda tıklayarak geçen pay, günlük oturum, oturum süresi (dk, medyan),
@@ -85,10 +103,22 @@ const URGE_BASE = (capH) => (capH <= 2 ? 0.22 : capH <= 4 ? 0.12 : 0.05);
 const urgeArg = process.argv.indexOf('--urge');
 const URGE_MULT = urgeArg > 0 ? Number(process.argv[urgeArg + 1]) : 1;
 const URGE = (capH) => Math.min(0.95, URGE_BASE(capH) * URGE_MULT);
+// --streakw <logit/gün>: serinin kendisinin oyuncuyu geri çağırma etkisi (varsayım; varsayılan 0, en çok 7 gün)
+const streakArg = process.argv.indexOf('--streakw');
+const STREAK_W = streakArg > 0 ? Number(process.argv[streakArg + 1]) : 0;
+// --orderw <0..1>: teslim edilen siparişin bir ilerleme anı olarak ağırlığı (1 = seviye atlama kadar, varsayılan 1)
+const orderwArg = process.argv.indexOf('--orderw');
+const ORDER_W = orderwArg > 0 ? Number(process.argv[orderwArg + 1]) : 1;
 const capLossArg = process.argv.indexOf('--caploss');
 if (capLossArg > 0) W.cappedLoss = Number(process.argv[capLossArg + 1]);
 const tagArg = process.argv.indexOf('--tag');
 const TAG = tagArg > 0 ? process.argv[tagArg + 1] : '';
+
+// Oyuncunun yerel takvim günü (YYYY-MM-DD): kurulum günü + kurulumdan beri geçen gün
+function dayKey(p, day) {
+  const d = new Date((START_EPOCH + (p.installDay + day) * DAY) * 1000);
+  return d.toISOString().slice(0, 10);
+}
 
 /* ---------------- olay kaydı ---------------- */
 const events = [];
@@ -204,6 +234,8 @@ function simulatePlayer(i) {
     // ---- uzakta geçen süre ve Hoş geldin kartı ----
     let moments = 0;
     let cappedLoss = false;
+    // seviye takibi Hoş geldin toplamasından önce başlar: toplanan kahveyle gelen seviyeler de sayılır
+    let levelBefore = playerLevel();
     if (lastSeen !== null) {
       const away = s.start - lastSeen;
       if (away < config.offline.minSeconds) dispatch({ type: 'tick', dt: away });
@@ -218,6 +250,7 @@ function simulatePlayer(i) {
       dayPrestige = false;
     }
     truthDays.add(day);
+    if (ORDERS) dispatch({ type: 'newDay', day: dayKey(p, day) });
     emit(p, s.start, 'session_begin', {
       session_number: sessionNo,
       days_since_install: day,
@@ -247,7 +280,6 @@ function simulatePlayer(i) {
     // rehberli oyuncu ilk oturumda rehberi bitirmeye niyetlidir (yarısı süreyi uzatır)
     const stayForGuide = p.variant === 'guide' && sessionNo === 1 && U[0][2] < 0.5;
     let tapAcc = 0;
-    let levelBefore = playerLevel();
     let tutorialDoneNow = false;
     for (let t = 0; t < len; t += 1) {
       const now = s.start + t;
@@ -339,6 +371,32 @@ function simulatePlayer(i) {
         boredomActive = 0;
       }
 
+      // ---- günlük siparişler: tamamlananı teslim et, bonusu al, Altın Çekirdeği harca ----
+      if (ORDERS && state.daily && t % 5 === 0) {
+        state.daily.orders.forEach((o, idx) => {
+          if (!o.claimed && o.progress >= o.target) {
+            const firstToday = !state.daily.orders.some((x) => x.claimed);
+            const before = state.streak.count;
+            dispatch({ type: 'claimOrder', index: idx });
+            moments += ORDER_W;
+            boredomActive = 0;
+            p.ordersDone = (p.ordersDone ?? 0) + 1;
+            emit(p, now, 'daily_order_complete', { type: o.type, target: o.target, streak: state.streak.count, first_today: firstToday ? 1 : 0 });
+            if (firstToday && state.streak.count !== before + 1 && before > 0) emit(p, now, 'streak_reset', { from: before });
+          }
+        });
+        if (!state.daily.bonusClaimed && state.daily.orders.every((o) => o.claimed)) {
+          dispatch({ type: 'claimBonus' });
+          emit(p, now, 'daily_bonus', { streak: state.streak.count });
+        }
+        if (state.gold >= config.orders.instantCost && economy.cpsFor(state) > 0 && buyR() < 0.5) {
+          const c0 = state.coffees;
+          dispatch({ type: 'instantBrew' });
+          p.instant = (p.instant ?? 0) + 1;
+          emit(p, now, 'gold_spend', { item: 'instant_brew', coffees: Math.round(state.coffees - c0) });
+        }
+      }
+
       // ---- rehber ----
       if (tutorial === 'active' && currentTutorialStep(state, economy) === null) {
         tutorial = 'done';
@@ -403,6 +461,7 @@ function simulatePlayer(i) {
         W.boredom * Math.min(boredomActive / 60, 30) +
         (endgame ? W.endgame : 0) +
         W.habit * Math.min(day, 10) +
+        (ORDERS && state.streak.lastDay === dayKey(p, day) ? STREAK_W * Math.min(state.streak.count, 7) : 0) +
         (dayCapped ? W.cappedLoss : 0) +
         (dayPrestige ? W.prestige : 0);
       if (Ud[Math.min(day, DAYS)] > sigmoid(logit)) {
@@ -427,6 +486,11 @@ function simulatePlayer(i) {
     churned: churnedAt !== null ? 1 : 0,
     max_level: playerLevel() + 1,
     prestiges,
+    orders_done: p.ordersDone ?? 0,
+    instant_brews: p.instant ?? 0,
+    gold: state.gold ?? 0,
+    streak: state.streak?.count ?? 0,
+    best_streak: state.streak?.best ?? 0,
     clicks: state.clicks,
     coffees: Math.round(state.coffees),
     tutorial_status: tutorial,
@@ -441,8 +505,13 @@ function simulatePlayer(i) {
 for (let i = 0; i < N; i += 1) simulatePlayer(i);
 
 fs.mkdirSync(outDir, { recursive: true });
-const ev = events.map((e) => JSON.stringify(e)).join('\n');
-fs.writeFileSync(path.join(outDir, `events-${scenario}${TAG}.jsonl.gz`), zlib.gzipSync(ev));
+// Parça parça yaz (çok sayıda olay tek bir metne sığmaz); art arda gzip parçaları geçerli bir gzip dosyasıdır
+const evPath = path.join(outDir, `events-${scenario}${TAG}.jsonl.gz`);
+fs.writeFileSync(evPath, Buffer.alloc(0));
+for (let i = 0; i < events.length; i += 100_000) {
+  const chunk = events.slice(i, i + 100_000).map((e) => JSON.stringify(e)).join('\n') + '\n';
+  fs.appendFileSync(evPath, zlib.gzipSync(chunk));
+}
 fs.writeFileSync(path.join(outDir, `players-${scenario}${TAG}.json`), JSON.stringify(players));
 // hızlı özet (doğru değer, izin vermeyenler dahil)
 const ret = (n) => players.filter((p) => p.days.split(' ').map(Number).includes(n)).length / players.length;

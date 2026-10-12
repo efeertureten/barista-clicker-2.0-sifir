@@ -2,6 +2,7 @@
 // Remote Config geldiğinde aynı fonksiyonlar uzaktan gelen sayılarla çalışır.
 
 import { DEFAULT_CONFIG } from './config.js';
+import { advanceStreak, bumpOrders, INITIAL_STREAK, makeDailyOrders } from './orders.js';
 
 // Yükseltmelerin kimlikleri içerikle (ad, görsel) sabittir; Remote Config yalnızca sayılarını değiştirir
 export const UPGRADE_IDS = Object.keys(DEFAULT_CONFIG.upgrades);
@@ -20,13 +21,18 @@ export const INITIAL_STATE = {
   // Yeni şube açılınca bu ikisi dışında şubeye ait her şey sıfırlanır.
   reputation: 0,
   branches: 1,
+  // Günlük siparişler (orders.js): { day, orders: [...], bonusClaimed } · Altın Çekirdek · seri.
+  // Bunlar şubeye değil oyuncuya aittir; Yeni Şube'de korunur.
+  daily: null,
+  gold: 0,
+  streak: INITIAL_STREAK,
   // Uzaktayken biriken, henüz toplanmamış üretim:
   // { coffees, seconds (depoya sayılan süre), away (gerçek uzak kalma süresi), capped (depo doldu mu) }
   offline: null,
 };
 
 export function createEconomy(config) {
-  const { shops, upgrades, costGrowth, offline, milestones, milestoneMultiplier, prestige } = config;
+  const { shops, upgrades, costGrowth, offline, milestones, milestoneMultiplier, prestige, orders } = config;
 
   // Yalnızca fincan sayısına göre seviye
   const levelFromCoffees = (coffees) => {
@@ -80,10 +86,20 @@ export function createEconomy(config) {
 
   function reducer(state, action) {
     switch (action.type) {
-      case 'click':
-        return { ...produce(state, perClickFor(state)), clicks: state.clicks + 1 };
-      case 'tick':
-        return produce(state, cpsFor(state) * action.dt);
+      case 'click': {
+        const amount = perClickFor(state);
+        const next = produce(state, amount);
+        return {
+          ...next,
+          clicks: state.clicks + 1,
+          daily: bumpOrders(bumpOrders(state.daily, 'tap', 1), 'brew', amount),
+        };
+      }
+      case 'tick': {
+        const amount = cpsFor(state) * action.dt;
+        const next = produce(state, amount);
+        return next === state ? state : { ...next, daily: bumpOrders(state.daily, 'brew', amount) };
+      }
       // Oyuncu action.seconds boyunca uzaktaydı: üretimin bir kısmı depoda birikir, depo dolunca durur.
       // Toplanmamış birikim varsa üstüne eklenir; depo sınırı ikisinin toplamına uygulanır.
       case 'away': {
@@ -105,7 +121,8 @@ export function createEconomy(config) {
       // Birikeni kasaya aktar. multiplier: ileride ödüllü reklamla "2 kat topla" için
       case 'collectOffline': {
         if (!state.offline) return state;
-        return produce({ ...state, offline: null }, state.offline.coffees * (action.multiplier ?? 1));
+        const next = produce({ ...state, offline: null }, state.offline.coffees * (action.multiplier ?? 1));
+        return { ...next, daily: bumpOrders(state.daily, 'collect', 1) };
       }
       case 'buy': {
         if (!upgrades[action.id] || !isUnlocked(action.id, levelOf(state))) return state;
@@ -115,7 +132,46 @@ export function createEconomy(config) {
           ...state,
           money: state.money - cost,
           owned: { ...state.owned, [action.id]: (state.owned[action.id] ?? 0) + 1 },
+          daily: bumpOrders(state.daily, 'buy', 1),
         };
+      }
+      // Yeni gün: siparişler o anki güce göre üretilir (aynı gün tekrar çağrılırsa bir şey olmaz)
+      case 'newDay': {
+        if (state.daily?.day === action.day) return state;
+        const cps = cpsFor(state);
+        const perClick = perClickFor(state);
+        const price = shops[levelOf(state)].price;
+        const stats = { cps, perClick, incomePerSec: (cps + perClick * 1.5) * price, hasProducer: cps > 0 };
+        return { ...state, daily: makeDailyOrders(action.day, stats, orders) };
+      }
+      // Tamamlanan siparişi teslim et: para ve Altın Çekirdek; günün ilk teslimi seriyi ilerletir
+      case 'claimOrder': {
+        const order = state.daily?.orders[action.index];
+        if (!order || order.claimed || order.progress < order.target) return state;
+        const firstToday = !state.daily.orders.some((o) => o.claimed);
+        const s = firstToday ? advanceStreak(state.streak, state.daily.day, orders) : null;
+        return {
+          ...state,
+          money: state.money + order.money,
+          earned: state.earned + order.money,
+          gold: state.gold + order.gold + (s?.gold ?? 0),
+          streak: s ? s.streak : state.streak,
+          daily: {
+            ...state.daily,
+            orders: state.daily.orders.map((o, i) => (i === action.index ? { ...o, claimed: true } : o)),
+          },
+        };
+      }
+      // Üç sipariş de teslim edildi: günün bonusu
+      case 'claimBonus': {
+        if (!state.daily || state.daily.bonusClaimed || !state.daily.orders.every((o) => o.claimed)) return state;
+        return { ...state, gold: state.gold + orders.goldAllBonus, daily: { ...state.daily, bonusClaimed: true } };
+      }
+      // Hızlı demleme: Altın Çekirdekle birkaç saatlik üretimi hemen al (siparişleri ilerletmez)
+      case 'instantBrew': {
+        const cps = cpsFor(state);
+        if (state.gold < orders.instantCost || cps <= 0) return state;
+        return { ...produce(state, cps * orders.instantHours * 3600), gold: state.gold - orders.instantCost };
       }
       // Yeni şube: itibar kazanılır; para, fincan, yükseltmeler ve dükkan seviyesi sıfırlanır.
       // Toplam kazanç ve tık sayısı oyuncunun ömür boyu istatistiği olarak kalır.
@@ -127,6 +183,9 @@ export function createEconomy(config) {
           earned: state.earned,
           reputation: (state.reputation ?? 0) + reputationGainOf(state),
           branches: (state.branches ?? 1) + 1,
+          daily: state.daily,
+          gold: state.gold,
+          streak: state.streak,
         };
       }
       case 'reset':

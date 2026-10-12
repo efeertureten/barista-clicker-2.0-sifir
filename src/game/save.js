@@ -1,6 +1,7 @@
 import { readJSON, writeJSON } from '../lib/storage.js';
 import { LEGACY_SHOP_THRESHOLDS } from './config.js';
 import { INITIAL_STATE, UPGRADE_IDS } from './economy.js';
+import { INITIAL_STREAK, ORDER_TYPES } from './orders.js';
 
 export const SAVE_KEY = 'barista-clicker-save-v1';
 
@@ -15,6 +16,34 @@ function loadOffline(offline) {
     seconds: num(offline.seconds),
     away: num(offline.away),
     capped: Boolean(offline.capped),
+  };
+}
+
+const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+function loadDaily(daily) {
+  if (!daily || typeof daily !== 'object' || !isDay(daily.day) || !Array.isArray(daily.orders)) return null;
+  const orders = daily.orders
+    .filter((o) => o && ORDER_TYPES.includes(o.type) && num(o.target) > 0)
+    .slice(0, 4)
+    .map((o) => ({
+      type: o.type,
+      target: num(o.target),
+      progress: Math.min(num(o.progress), num(o.target)),
+      money: num(o.money),
+      gold: Math.floor(num(o.gold)),
+      claimed: Boolean(o.claimed),
+    }));
+  return orders.length ? { day: daily.day, orders, bonusClaimed: Boolean(daily.bonusClaimed) } : null;
+}
+
+function loadStreak(streak) {
+  if (!streak || typeof streak !== 'object') return INITIAL_STREAK;
+  return {
+    count: Math.floor(num(streak.count)),
+    lastDay: isDay(streak.lastDay) ? streak.lastDay : null,
+    freezes: Math.min(10, Math.floor(num(streak.freezes ?? INITIAL_STREAK.freezes))),
+    best: Math.floor(num(streak.best)),
   };
 }
 
@@ -39,6 +68,9 @@ export function loadSave(initialSave) {
     level: loadLevel(save),
     reputation: Math.floor(num(save.reputation)),
     branches: Math.max(1, Math.floor(num(save.branches))),
+    daily: loadDaily(save.daily),
+    gold: Math.floor(num(save.gold)),
+    streak: loadStreak(save.streak),
     offline: loadOffline(save.offline),
   };
 }
