@@ -2,7 +2,7 @@
 // uzaktan değiştirebilir (bkz. mergeConfig); bu yüzden içinde metin ya da görsel yok, yalnızca sayılar var.
 // Metinler ve görseller content.js'te, bu sayılarla birleştirilerek kullanılır.
 
-export const APP_VERSION = '2.2.0';
+export const APP_VERSION = '2.2.1';
 
 export const DEFAULT_CONFIG = {
   // Ölçümde hangi dengeyle oynandığını ayırt etmek için (oyuncu özelliği: economy_version)
@@ -40,13 +40,16 @@ export const DEFAULT_CONFIG = {
   // Oyuncu yokken (sekme arka planda ya da oyun kapalı) dükkan çalışmaya devam eder:
   // efficiency: normal üretimin oranı · capSeconds: en çok kaç saniyelik üretim birikir (depo)
   // minSeconds: bundan kısa ayrılıklar "uzakta" sayılmaz, üretim tam hızla eklenir
+  // Depo 4 saat: sentetik betada 2 saatlik depo dönüşlerin %61'inde doluydu; 4 saat hiçbir varsayımda
+  // 2 saatin gerisinde kalmadı. 2/4/8 saat karşılaştırması soft launch'ta gerçek oyuncularla yapılacak.
   offline: {
     efficiency: 0.5,
-    capSeconds: 2 * 3600,
+    capSeconds: 4 * 3600,
     minSeconds: 60,
   },
 
   // İlk deneyim rehberi. share: yeni oyuncuların rehberi gören payı (1 = herkes, 0.5 = A/B testi).
+  // Sentetik betadan sonra rehber herkeste: market kısayoluyla ek etkisi küçüldü ve ölçmek için çok büyük örneklem gerekiyor.
   // Grup kurulumda cihazda belirlenir ve değişmez. Web'de Remote Config yeni oyuncuya ilk açılışta ulaşamaz
   // (izin ilk tıktan sonra sorulur), bu yüzden bu testin oranı şimdilik burada, kodda değiştirilir.
   tutorial: {

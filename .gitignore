@@ -3,3 +3,7 @@ dist/
 .DS_Store
 *.log
 .vite/
+
+# sentetik beta çıktıları
+tools/sentetik-beta/runs/
+tools/sentetik-beta/analysis/

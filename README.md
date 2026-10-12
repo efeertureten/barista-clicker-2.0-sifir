@@ -17,7 +17,7 @@ Yeni oyuncuyu bir rehber karşılar ve ilk dakikada döngünün dört parçasın
 - Marketten yükseltme al: tık başına daha çok kahve ya da sen tıklamazken çalışan otomatik üretim.
 - Toplam demlenen fincan sayısı arttıkça dükkânın büyür, büyüdükçe fincan başına satış fiyatı da artar ve markette yeni bir üretici açılır.
 - Bir üreticiden 25, 50, 100, 150, 200 ve 300 adete ulaştığında o üreticinin üretimi her seferinde 2 katına çıkar.
-- Sen yokken de dükkân yarım hızla çalışır. Kazanç en çok 2 saat birikir; döndüğünde "Hoş geldin" kartından kasaya toplarsın. Bir dakikadan kısa ayrılıklar sayılmaz, üretim tam hızla devam eder.
+- Sen yokken de dükkân yarım hızla çalışır. Kazanç en çok 4 saat birikir; döndüğünde "Hoş geldin" kartından kasaya toplarsın. Bir dakikadan kısa ayrılıklar sayılmaz, üretim tam hızla devam eder.
 - İlerleme tarayıcıda otomatik kaydedilir.
 
 ## Dükkân seviyeleri
@@ -99,11 +99,12 @@ src/
     analytics.js         ölçüm katmanı: izin, olay sırası, Firebase ve hata ayıklama çıkışı
     remoteConfig.js      Remote Config'ten "economy" parametresini indirir ve saklar
     firebaseConfig.js    Firebase yapılandırması (boşken hiçbir yere veri gitmez)
-  ui/                    stiller, market kartları, rehber, ses düğmesi, veri izni bandı, Hoş geldin kartı
+  ui/                    stiller, market kartları ve kısayolu, rehber, ses düğmesi, veri izni bandı, Hoş geldin kartı
   lib/                   localStorage ve dosya yolu yardımcıları
   barista-assets/        oyun görselleri (WebP)
   barista-sounds/        oyun sesleri (MP3)
   main.jsx, index.css    giriş noktası ve Tailwind
+tools/sentetik-beta/     gerçek oyun kodunu oynayan sentetik oyuncu simülatörü ve analizi
 public/                  favicon ve uygulama ikonları
 docs/                    README ekran görüntüleri
 ```
@@ -132,11 +133,14 @@ Oyunun bütün sayıları Firebase Remote Config'teki tek bir **`economy`** para
 - Remote Config de yalnızca veri iznini veren oyuncularda çalışır; diğerleri varsayılan dengeyle oynar.
 - Parametreyi silmek her şeyi varsayılana döndürür.
 
-## Rehber A/B testi
+## Sentetik beta
 
-Strateji belgesindeki 1 numaralı test: rehberli ilk dakika D1'i artırıyor mu? Yeni oyuncuların hangi payının rehberi göreceği `src/game/config.js` içindeki `tutorial.share` değeriyle belirlenir: `1` herkes (kapalı beta için varsayılan), `0.5` yarı yarıya. Grup oyuncunun cihazında kurulum anında bir kez atanır ve `tutorial_variant` oyuncu özelliğiyle ölçüme gider; iki grubun D1'i Firebase'de bu özelliğe göre karşılaştırılır.
+`tools/sentetik-beta` klasöründeki simülatör, oyunun gerçek kodunu oynayan sentetik oyuncularla 14 günlük bir beta üretir ve Firebase'e gidecek olayların aynısını yazar (ayrıntılar klasörün README'sinde). İlk çalıştırmadan çıkan kararlar:
 
-Bu oran Remote Config'ten değil koddan değiştirilir: web'de veri izni ilk tıktan sonra sorulduğu için Remote Config yeni bir oyuncuya ilk açılışta ulaşamaz.
+- **Telefonda market kısayolu:** rehbersiz telefon oyuncularının yarısı marketi ilk oturumda bulamıyordu. Telefonda ve tablette sağ altta sabit bir düğme markete götürür (alınabilir yükseltme sayısıyla), marketteyken latteye döndürür.
+- **Çevrimdışı depo 4 saat:** 2 saatlik depo dönüşlerin %61'inde doluydu; 4 saat hiçbir varsayımda 2 saatin gerisinde kalmadı.
+- **Rehber herkeste:** market kısayoluyla rehberin ek etkisi küçüldü, A/B testi için gereken örneklem çok büyüdü. Grup ataması kodda duruyor: `tutorial.share` değeri (`1` herkes, `0.5` yarı yarıya) ile yeniden açılabilir; grup kurulumda cihazda atanır ve `tutorial_variant` özelliğiyle ölçüme gider. Bu oran Remote Config'ten değil koddan değişir, çünkü web'de veri izni ilk tıktan sonra sorulduğu için Remote Config yeni oyuncuya ilk açılışta ulaşamaz.
+- **Sıradaki büyük iş Yeni Şube:** içerik bağlı oyuncular için 3. günde bitiyor; prestij D14 tutulmasını neredeyse ikiye katlıyor.
 
 ## Ölçüm
 
@@ -156,6 +160,7 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `tutorial_begin` | rehber grubundaki yeni oyuncu oyunu ilk açtığında | grup |
 | `tutorial_complete` | rehberin dört adımı bitince | rehberin başlangıcından beri geçen saniye, oturum numarası |
 | `tutorial_skip` | "Rehberi geç"e basıldığında | hangi adımda geçildiği |
+| `market_shortcut` | telefondaki market kısayoluna basıldığında | yön (`market` / `cup`), alınabilir yükseltme sayısı |
 | `level_up` | dükkân büyüdüğünde | yeni seviye ve adı, toplam aktif oyun dakikası |
 | `spend_virtual_currency` | yükseltme alındığında | yükseltme, ödenen tutar, alımdan sonraki adet, dükkân seviyesi |
 | `settings_change` | ses ya da müzik açılıp kapatıldığında | ayar ve yeni değeri |

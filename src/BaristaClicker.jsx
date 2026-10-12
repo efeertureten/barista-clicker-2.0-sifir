@@ -32,6 +32,7 @@ import ConsentBanner from './ui/ConsentBanner.jsx';
 import WelcomeBack from './ui/WelcomeBack.jsx';
 import { LockedUpgradeCard, UpgradeCard } from './ui/UpgradeCard.jsx';
 import TutorialGuide, { TutorialDone } from './ui/TutorialGuide.jsx';
+import MarketShortcut from './ui/MarketShortcut.jsx';
 
 // Büyük sahne görseli yalnızca dikey yer olduğunda (geniş ekranda yan yana düzen ya da uzun ekran) görünür;
 // diğer durumlarda dükkan adının yanında küçük resim gösterilir, böylece fincan ekranın altına itilmez.
@@ -466,6 +467,28 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     return () => io.disconnect();
   }, []);
 
+  // Telefonda market kısayolu: market ekranın yarısından fazlasını kaplıyorsa "marketteyiz"
+  const marketRef = useRef(null);
+  const [inMarket, setInMarket] = useState(false);
+  useEffect(() => {
+    const el = marketRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(
+      ([entry]) => setInMarket(entry.intersectionRect.height > window.innerHeight * 0.5),
+      { threshold: [0, 0.1, 0.25, 0.4, 0.6, 0.8, 1] },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const affordableCount = UPGRADES.filter(
+    (u) => economy.isUnlocked(u.id, shopIndex) && state.money >= economy.costOf(u.id, state.owned),
+  ).length;
+  const handleShortcut = () => {
+    analytics.track('market_shortcut', { to: inMarket ? 'cup' : 'market', affordable: affordableCount });
+    if (inMarket) scrollToId('bc-cup');
+    else marketRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   // Rehber başlarken dar ekranda fincanı ortala: alttaki şerit fincanı örtmesin
   const centeredForGuide = useRef(false);
   useEffect(() => {
@@ -534,7 +557,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       onPointerDown={unlockAudio}
       onKeyDown={unlockAudio}
       className={`bc-root flex min-h-full w-full flex-col bg-[var(--foam)] text-[var(--ink)] lg:grid lg:h-full lg:grid-cols-[minmax(0,1fr)_400px] ${
-        guide || tutorialDone ? 'pb-56 lg:pb-0' : ''
+        guide || tutorialDone ? 'pb-56 lg:pb-0' : 'pb-24 lg:pb-0'
       }`}
     >
       <style>{STYLES}</style>
@@ -769,7 +792,12 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       </main>
 
       {/* ---------------- Sağ: Market ---------------- */}
-      <aside aria-label="Market" className="bg-[var(--espresso)] text-[var(--on-dark)] lg:h-full lg:overflow-y-auto">
+      <aside
+        ref={marketRef}
+        id="bc-market"
+        aria-label="Market"
+        className="bg-[var(--espresso)] text-[var(--on-dark)] lg:h-full lg:overflow-y-auto"
+      >
         <div className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8">
           <header className="flex items-end justify-between gap-3">
             <div>
@@ -882,6 +910,11 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
             </div>
           </div>
         </div>
+      )}
+
+      {/* ---------------- Telefonda market kısayolu (rehber açıkken rehberin kendi düğmeleri var) ---------------- */}
+      {!guide && !tutorialDone && (
+        <MarketShortcut affordable={affordableCount} inMarket={inMarket} onClick={handleShortcut} />
       )}
 
       {/* ---------------- Hoş geldin: uzaktayken biriken üretim ---------------- */}
