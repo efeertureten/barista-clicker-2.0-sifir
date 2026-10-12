@@ -47,8 +47,24 @@ export function subscribe(listener) {
 async function loadFirebase() {
   const [{ initializeApp }, lib] = await Promise.all([import('firebase/app'), import('firebase/analytics')]);
   if (!(await lib.isSupported())) return null;
+  const app = initializeApp(FIREBASE_CONFIG);
   // Hata ayıklama modunda bu tarayıcının olayları Firebase konsolundaki DebugView'da canlı görünür
-  const instance = lib.initializeAnalytics(initializeApp(FIREBASE_CONFIG), debug ? { config: { debug_mode: true } } : {});
+  const instance = lib.initializeAnalytics(app, debug ? { config: { debug_mode: true } } : {});
+  // Oyun dengesi: arka planda indirilir, bir sonraki açılışta uygulanır; hata olursa oyun varsayılanla devam eder
+  import('./remoteConfig.js')
+    .then((rc) => rc.refreshRemoteConfig(app, { debug }))
+    .then((result) => {
+      if (debug) {
+        window.__bcRemoteConfig = result;
+        console.info('[ölçüm] Remote Config', result);
+      }
+    })
+    .catch((error) => {
+      if (debug) {
+        window.__bcRemoteConfig = { status: 'error', message: String(error?.message || error) };
+        console.info('[ölçüm] Remote Config alınamadı', error);
+      }
+    });
   return {
     log: (name, params) => lib.logEvent(instance, name, params),
     setUserProperties: (props) => lib.setUserProperties(instance, props),

@@ -15,7 +15,8 @@ import cupImg from './barista-assets/cup.webp';
 import beanImg from './barista-assets/bean.webp';
 import { src } from './lib/asset.js';
 import { readPref, writePref } from './lib/storage.js';
-import { APP_VERSION, DEFAULT_CONFIG } from './game/config.js';
+import { APP_VERSION } from './game/config.js';
+import { loadActiveConfig } from './game/activeConfig.js';
 import { buildShops, buildUpgrades } from './game/content.js';
 import { createEconomy } from './game/economy.js';
 import { hasSave, loadSave, readLastActiveAt, writeSave } from './game/save.js';
@@ -28,6 +29,7 @@ import { STYLES } from './ui/styles.js';
 import AudioToggle from './ui/AudioToggle.jsx';
 import ConsentBanner from './ui/ConsentBanner.jsx';
 import WelcomeBack from './ui/WelcomeBack.jsx';
+import { LockedUpgradeCard, UpgradeCard } from './ui/UpgradeCard.jsx';
 
 // Büyük sahne görseli yalnızca dikey yer olduğunda (geniş ekranda yan yana düzen ya da uzun ekran) görünür;
 // diğer durumlarda dükkan adının yanında küçük resim gösterilir, böylece fincan ekranın altına itilmez.
@@ -49,8 +51,12 @@ function makeBeanBurst() {
 }
 
 // Not: Kök eleman h-full kullanır; ebeveyni tam yükseklikte olmalı (ya da h-screen'e çevir).
-// config: oyunun denge sayıları (game/config.js). İleride Remote Config'ten gelen değerler buradan verilecek.
-export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_CONFIG } = {}) {
+// config: oyunun denge sayıları. Verilmezse varsayılan denge + Remote Config'ten en son gelen değişiklikler
+// kullanılır (game/activeConfig.js); oturum boyunca değişmez.
+export default function BaristaClicker({ initialSave, onSave, config: configProp } = {}) {
+  const [{ config, rejected: rejectedConfig }] = useState(() =>
+    configProp ? { config: configProp, rejected: [] } : loadActiveConfig(),
+  );
   const economy = useMemo(() => createEconomy(config), [config]);
   const UPGRADES = useMemo(() => buildUpgrades(config), [config]);
   const SHOPS = useMemo(() => buildShops(config), [config]);
@@ -83,14 +89,18 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
   const sfx = (name, options) => soundRef.current?.play(name, options);
   const unlockAudio = () => soundRef.current?.unlock();
 
-  const shopIndex = economy.shopIndexOf(state.coffees);
+  const shopIndex = economy.levelOf(state);
   const shop = SHOPS[shopIndex];
   const nextShop = SHOPS[shopIndex + 1];
   const perClick = economy.perClickOf(state.owned);
   const cps = economy.cpsOf(state.owned);
+  // Seviye hiç düşmediği için fincan sayısı o dükkanın eşiğinin altında kalabilir (eski kayıt, yeni denge)
   const shopProgress = nextShop
-    ? Math.min(1, (state.coffees - shop.at) / (nextShop.at - shop.at))
+    ? Math.min(1, Math.max(0, (state.coffees - shop.at) / (nextShop.at - shop.at)))
     : 1;
+  // Markette: açılmış yükseltmeler ve bir sonraki dükkanda açılacak ilk üretici (hedef olarak)
+  const firstLocked = UPGRADES.find((u) => !economy.isUnlocked(u.id, shopIndex));
+  const marketUpgrades = UPGRADES.filter((u) => economy.isUnlocked(u.id, shopIndex) || u === firstLocked);
   const shopIndexRef = useRef(shopIndex);
   shopIndexRef.current = shopIndex;
 
@@ -100,6 +110,7 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
     setConsentState(analytics.getConsent());
     const unsubscribe = analytics.subscribe(setConsentState);
     const meta = createMeta({ hadSave: hadSaveAtStart });
+    if (rejectedConfig.length) analytics.track('config_rejected', { fields: rejectedConfig.join(',') });
     metaRef.current = meta;
 
     const beginSession = () => {
@@ -117,6 +128,7 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
     analytics.setUserProperties({
       install_cohort: meta.installCohort,
       app_version: APP_VERSION,
+      economy_version: config.version,
       max_shop_level: shopIndexRef.current + 1,
       sound: readPref(SOUND_PREF_KEY) ? 'on' : 'off',
       music: readPref(MUSIC_PREF_KEY) ? 'on' : 'off',
@@ -137,6 +149,8 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
       document.removeEventListener('visibilitychange', onVisibility);
       unsubscribe();
     };
+    // Yalnızca açılışta bir kez çalışır
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hadSaveAtStart]);
 
   const markFtue = (step, stepNumber) => {
@@ -209,13 +223,24 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
   // Bir yükseltme yeni alınabilir hale geldiğinde ince bir "ting"
   const affordableRef = useRef(null);
   useEffect(() => {
-    const now = UPGRADES.map((u) => state.money >= economy.costOf(u.id, state.owned));
+    const level = economy.levelOf(state);
+    const now = UPGRADES.map((u) => economy.isUnlocked(u.id, level) && state.money >= economy.costOf(u.id, state.owned));
     const prev = affordableRef.current;
     affordableRef.current = now;
     if (prev && now.some((ok, i) => ok && !prev[i])) {
       soundRef.current?.play('ting', { minGap: 0.8, maxVoices: 1 });
     }
-  }, [state.money, state.owned, UPGRADES, economy]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.money, state.owned, state.level, UPGRADES, economy]);
+
+  // Kısa bildirim (dükkan büyüdü, kilometre taşı): 3,5 sn sonra kendiliğinden kapanır
+  const toastTimer = useRef(null);
+  const showToast = (next) => {
+    clearTimeout(toastTimer.current);
+    setToast(next);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
+  };
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   // Dükkan büyüdüğünde bildirim ve kapı zili; son seviyede melodi yerine fanfar çalar
   const prevShop = useRef(shopIndex);
@@ -236,12 +261,19 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
       });
       analytics.setUserProperties({ max_shop_level: shopIndex + 1 });
       if (shopIndex === 1) markFtue('first_level_up', 3);
-      setToast(SHOPS[shopIndex]);
-      const t = setTimeout(() => setToast(null), 3500);
-      return () => clearTimeout(t);
+      // Bu büyümeyle markette açılan yeni üreticiler
+      const unlocked = UPGRADES.filter((u) => u.unlockLevel > prev + 1 && u.unlockLevel <= shopIndex + 1);
+      const reached = SHOPS[shopIndex];
+      showToast({
+        key: `level-${shopIndex}`,
+        title: `Dükkan büyüdü: ${reached.name}`,
+        subtitle: `Fincan ${fmtPrice(reached.price)}${unlocked.length ? ` · Markette yeni: ${unlocked.map((u) => u.name).join(', ')}` : ''}`,
+        image: reached.thumb,
+        tint: reached.tint,
+      });
+    } else if (shopIndex < prev) {
+      setToast(null);
     }
-    if (shopIndex < prev) setToast(null);
-    return undefined;
     // Yalnızca seviye değişince çalışır; içerideki sesler ve ölçüm her seferinde güncel değerleri okur
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shopIndex]);
@@ -318,7 +350,8 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
 
   const handleBuy = (upgrade) => {
     const cost = economy.costOf(upgrade.id, state.owned);
-    if (state.money < cost) return;
+    if (state.money < cost || !economy.isUnlocked(upgrade.id, shopIndex)) return;
+    const ownedAfter = state.owned[upgrade.id] + 1;
     dispatch({ type: 'buy', id: upgrade.id });
     sfx(upgrade.sound, { vary: 0.03, maxVoices: 2 });
     // Oyun içi para harcaması için Google Analytics'in önerdiği olay adı
@@ -326,10 +359,30 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
       virtual_currency_name: 'TL',
       value: cost,
       item_name: upgrade.id,
-      owned_after: state.owned[upgrade.id] + 1,
+      owned_after: ownedAfter,
       shop_level: shopIndex + 1,
     });
     markFtue('first_purchase', 2);
+
+    // Kilometre taşı: bu alımla üreticinin üretimi katlandı
+    if (economy.isProducer(upgrade.id) && config.milestones.includes(ownedAfter)) {
+      const multiplier = economy.multiplierOf(upgrade.id, ownedAfter);
+      sfx('ting', { delay: 0.25, maxVoices: 2 });
+      sfx('ting', { delay: 0.45, maxVoices: 2 });
+      showToast({
+        key: `milestone-${upgrade.id}-${ownedAfter}`,
+        title: `${upgrade.name}: ${ownedAfter} adet!`,
+        subtitle: `Üretimi ${fmt(config.milestoneMultiplier)} katına çıktı · toplam ×${fmt(multiplier)}`,
+        image: upgrade.image,
+        icon: upgrade.icon,
+      });
+      analytics.track('milestone_reached', {
+        item_name: upgrade.id,
+        count: ownedAfter,
+        multiplier,
+        shop_level: shopIndex + 1,
+      });
+    }
   };
 
   // Hoş geldin kartı: uzaktayken biriken üretimi kasaya aktar
@@ -605,70 +658,46 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
           </header>
 
           <div className="flex flex-col gap-3">
-            {UPGRADES.map((upgrade) => {
+            {marketUpgrades.map((upgrade) => {
+              if (!economy.isUnlocked(upgrade.id, shopIndex)) {
+                return (
+                  <LockedUpgradeCard
+                    key={upgrade.id}
+                    upgrade={upgrade}
+                    shopName={SHOPS[upgrade.unlockLevel - 1].name}
+                    cps={upgrade.cps ?? 0}
+                  />
+                );
+              }
               const owned = state.owned[upgrade.id];
               const cost = economy.costOf(upgrade.id, state.owned);
-              const affordable = state.money >= cost;
-              const progress = Math.min(1, state.money / cost);
-
+              const producer = economy.isProducer(upgrade.id);
+              const next = economy.nextMilestone(owned);
               return (
-                <button
+                <UpgradeCard
                   key={upgrade.id}
-                  type="button"
-                  disabled={!affordable}
-                  onClick={() => handleBuy(upgrade)}
-                  aria-label={`${upgrade.name} satın al, ${fmtMoney(cost)}. Sahip olunan: ${owned}`}
-                  className="group relative w-full overflow-hidden rounded-2xl border border-[var(--line-dark)] bg-[var(--espresso-2)] p-4 text-left transition duration-150 enabled:hover:border-[var(--crema)] enabled:hover:bg-[var(--espresso-3)] enabled:active:scale-[0.985] disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)]"
-                >
-                  <div className="flex items-start gap-3">
-                    <span
-                      className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl transition-colors ${
-                        affordable
-                          ? 'bg-[var(--crema-soft)] ring-1 ring-inset ring-[rgba(208,146,74,0.5)]'
-                          : 'bg-[var(--espresso-3)]'
-                      }`}
-                    >
-                      <img
-                        key={affordable ? 'ready' : 'locked'}
-                        src={src(upgrade.image)}
-                        alt=""
-                        width={256}
-                        height={256}
-                        draggable={false}
-                        className={`bc-img absolute inset-0 h-full w-full object-contain transition duration-200 ease-out ${
-                          upgrade.anchorBottom ? 'origin-bottom object-bottom pt-1' : 'p-1'
-                        } ${affordable ? 'bc-pop group-hover:-rotate-3 group-hover:scale-110' : 'opacity-45 grayscale'}`}
-                      />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <h3 className="bc-display text-base font-semibold leading-tight">{upgrade.name}</h3>
-                        <span className="bc-mono shrink-0 text-xs text-[var(--on-dark-muted)]">{owned} adet</span>
-                      </div>
-                      <p className="mt-1 text-[13px] leading-snug text-[var(--on-dark-muted)]">{upgrade.desc}</p>
-                      <div className="mt-3 flex items-center justify-between gap-2">
-                        <span className="rounded-full bg-[var(--crema-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--crema)]">
-                          {upgrade.effect}
-                        </span>
-                        <span
-                          className={`bc-mono text-base font-semibold ${
-                            affordable ? 'text-[var(--crema)]' : 'text-[var(--on-dark-muted)]'
-                          }`}
-                        >
-                          {fmtMoney(cost)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  {!affordable && (
-                    <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 bg-[var(--line-dark)]">
-                      <span
-                        className="block h-full bg-[var(--crema)] opacity-70 transition-[width] duration-300"
-                        style={{ width: `${progress * 100}%` }}
-                      />
-                    </span>
-                  )}
-                </button>
+                  upgrade={upgrade}
+                  owned={owned}
+                  cost={cost}
+                  affordable={state.money >= cost}
+                  progress={Math.min(1, state.money / cost)}
+                  effect={
+                    producer
+                      ? `+${fmtRate(economy.unitCpsOf(upgrade.id, state.owned))} kahve / sn`
+                      : `+${fmt(upgrade.perClick)} kahve / tık`
+                  }
+                  milestone={
+                    producer
+                      ? {
+                          next,
+                          prev: [...config.milestones].reverse().find((m) => owned >= m) ?? 0,
+                          multiplier: economy.multiplierOf(upgrade.id, owned),
+                          step: config.milestoneMultiplier,
+                        }
+                      : null
+                  }
+                  onBuy={() => handleBuy(upgrade)}
+                />
               );
             })}
           </div>
@@ -693,29 +722,34 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
         </div>
       </aside>
 
-      {/* ---------------- Dükkan büyüdü bildirimi ---------------- */}
+      {/* ---------------- Bildirim: dükkan büyüdü, kilometre taşı ---------------- */}
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-50 flex justify-center px-4">
           <div
+            key={toast.key}
             role="status"
-            className="bc-toast flex items-center gap-3 rounded-2xl bg-[var(--ink)] py-2.5 pl-2.5 pr-4 text-[var(--on-dark)] shadow-[0_20px_40px_-20px_rgba(0,0,0,0.6)]"
+            className="bc-toast flex max-w-md items-center gap-3 rounded-2xl bg-[var(--ink)] py-2.5 pl-2.5 pr-4 text-[var(--on-dark)] shadow-[0_20px_40px_-20px_rgba(0,0,0,0.6)]"
           >
             <span
-              className="h-12 w-12 shrink-0 overflow-hidden rounded-xl ring-2 ring-[var(--crema)]"
-              style={{ backgroundColor: toast.tint }}
+              className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-[var(--espresso-3)] text-[var(--crema)] ring-2 ring-[var(--crema)]"
+              style={toast.tint ? { backgroundColor: toast.tint } : undefined}
             >
-              <img
-                src={src(toast.thumb)}
-                alt=""
-                width={192}
-                height={192}
-                draggable={false}
-                className="bc-img h-full w-full object-cover"
-              />
+              {toast.image ? (
+                <img
+                  src={src(toast.image)}
+                  alt=""
+                  width={192}
+                  height={192}
+                  draggable={false}
+                  className={`bc-img h-full w-full ${toast.tint ? 'object-cover' : 'object-contain p-1'}`}
+                />
+              ) : (
+                toast.icon && <toast.icon size={24} strokeWidth={1.8} aria-hidden="true" />
+              )}
             </span>
-            <div>
-              <p className="bc-display text-sm font-extrabold">Dükkan büyüdü: {toast.name}</p>
-              <p className="text-xs text-[var(--on-dark-muted)]">Fincan fiyatı artık {fmtPrice(toast.price)}</p>
+            <div className="min-w-0">
+              <p className="bc-display text-sm font-extrabold">{toast.title}</p>
+              <p className="text-xs text-[var(--on-dark-muted)]">{toast.subtitle}</p>
             </div>
           </div>
         </div>

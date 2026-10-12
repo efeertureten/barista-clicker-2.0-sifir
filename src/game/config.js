@@ -1,28 +1,40 @@
-// Oyunun dengesini belirleyen bütün sayılar burada toplanır. İleride Remote Config bu nesnenin
-// alanlarını uzaktan değiştirecek; bu yüzden içinde metin ya da görsel yok, yalnızca sayılar var.
+// Oyunun dengesini belirleyen bütün sayılar burada toplanır. Remote Config bu nesnenin alanlarını
+// uzaktan değiştirebilir (bkz. mergeConfig); bu yüzden içinde metin ya da görsel yok, yalnızca sayılar var.
 // Metinler ve görseller content.js'te, bu sayılarla birleştirilerek kullanılır.
 
-export const APP_VERSION = '2.0.2';
+export const APP_VERSION = '2.1.0';
 
 export const DEFAULT_CONFIG = {
+  // Ölçümde hangi dengeyle oynandığını ayırt etmek için (oyuncu özelliği: economy_version)
+  version: 'econ-2.1',
+
   // Her alımda yükseltmenin fiyatı bu katsayıyla çarpılır (1.15 = %15 artış)
   costGrowth: 1.15,
 
-  // perClick: tık başına eklenen kahve · cps: saniyede eklenen kahve
+  // perClick: tık başına eklenen kahve · cps: saniyede eklenen kahve · unlockLevel: markette açıldığı dükkan seviyesi
   upgrades: {
-    beans: { baseCost: 15, perClick: 1 },
-    machine: { baseCost: 60, cps: 1 },
-    barista: { baseCost: 500, cps: 10 },
+    beans: { baseCost: 15, perClick: 1, unlockLevel: 1 },
+    machine: { baseCost: 60, cps: 1, unlockLevel: 1 },
+    barista: { baseCost: 600, cps: 8, unlockLevel: 1 },
+    filter: { baseCost: 8_000, cps: 55, unlockLevel: 2 },
+    roaster: { baseCost: 110_000, cps: 380, unlockLevel: 3 },
+    truck: { baseCost: 1_600_000, cps: 2_600, unlockLevel: 4 },
+    dealers: { baseCost: 24_000_000, cps: 18_000, unlockLevel: 5 },
+    plantation: { baseCost: 400_000_000, cps: 130_000, unlockLevel: 6 },
   },
+
+  // Kilometre taşları: bir üreticiden bu adetlere ulaşınca o üreticinin üretimi milestoneMultiplier katına çıkar
+  milestones: [25, 50, 100, 150, 200, 300],
+  milestoneMultiplier: 2,
 
   // at: o dükkana geçmek için gereken toplam fincan · price: fincan başına satış fiyatı (₺)
   shops: [
     { at: 0, price: 1 },
-    { at: 150, price: 1.25 },
-    { at: 1500, price: 1.5 },
-    { at: 15000, price: 2 },
-    { at: 150000, price: 3 },
-    { at: 2000000, price: 5 },
+    { at: 300, price: 1.25 },
+    { at: 12_000, price: 1.5 },
+    { at: 400_000, price: 2 },
+    { at: 15_000_000, price: 3 },
+    { at: 100_000_000_000, price: 5 },
   ],
 
   // Oyuncu yokken (sekme arka planda ya da oyun kapalı) dükkan çalışmaya devam eder:
@@ -34,3 +46,93 @@ export const DEFAULT_CONFIG = {
     minSeconds: 60,
   },
 };
+
+// 2.1'den önceki seviye eşikleri: eski kayıtlarda oyuncunun ulaştığı seviyeyi bulmak için
+export const LEGACY_SHOP_THRESHOLDS = [0, 150, 1_500, 15_000, 150_000, 2_000_000];
+
+/* ---- Uzaktan gelen değerleri doğrulayarak birleştirme ---- */
+
+const isNum = (v, min, max) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
+const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
+
+// override: Remote Config'teki "economy" parametresinin JSON'u; yalnızca değişecek alanlar yazılır, örn.
+//   { "version": "cap-4h", "offline": { "capSeconds": 14400 } }
+// Geçersiz ya da bilinmeyen her alan tek tek atlanır; oyun asla bozuk bir dengeyle açılmaz.
+// Dönen değer: { config, rejected: ['offline.capSeconds', …] }
+export function mergeConfig(base, override) {
+  const config = structuredClone(base);
+  const rejected = [];
+  if (!override || typeof override !== 'object' || Array.isArray(override)) return { config, rejected };
+  const levels = base.shops.length;
+
+  const take = (path, value, ok, apply) => {
+    if (value === undefined) return;
+    if (ok(value)) apply(value);
+    else rejected.push(path);
+  };
+
+  take('version', override.version, (v) => typeof v === 'string' && v.length > 0 && v.length <= 40, (v) => {
+    config.version = v;
+  });
+  take('costGrowth', override.costGrowth, (v) => isNum(v, 1.01, 2), (v) => {
+    config.costGrowth = v;
+  });
+  take('milestoneMultiplier', override.milestoneMultiplier, (v) => isNum(v, 1, 10), (v) => {
+    config.milestoneMultiplier = v;
+  });
+  take(
+    'milestones',
+    override.milestones,
+    (v) => Array.isArray(v) && v.length <= 20 && v.every((m, i) => isInt(m, 1, 100_000) && (i === 0 || m > v[i - 1])),
+    (v) => {
+      config.milestones = [...v];
+    },
+  );
+  take(
+    'shops',
+    override.shops,
+    (v) =>
+      Array.isArray(v) &&
+      v.length === levels &&
+      v.every((s, i) => s && isNum(s.at, 0, 1e18) && isNum(s.price, 0.01, 1e6) && (i === 0 ? s.at === 0 : s.at > v[i - 1].at)),
+    (v) => {
+      config.shops = v.map(({ at, price }) => ({ at, price }));
+    },
+  );
+
+  if (override.upgrades && typeof override.upgrades === 'object') {
+    Object.entries(override.upgrades).forEach(([id, u]) => {
+      const target = config.upgrades[id];
+      if (!target || !u || typeof u !== 'object') {
+        rejected.push(`upgrades.${id}`);
+        return;
+      }
+      take(`upgrades.${id}.baseCost`, u.baseCost, (v) => isNum(v, 1, 1e18), (v) => {
+        target.baseCost = v;
+      });
+      take(`upgrades.${id}.unlockLevel`, u.unlockLevel, (v) => isInt(v, 1, levels), (v) => {
+        target.unlockLevel = v;
+      });
+      // Bir yükseltmenin türü değişmez: tık yükseltmesi tık, üretici üretici kalır
+      const field = 'perClick' in target ? 'perClick' : 'cps';
+      take(`upgrades.${id}.${field}`, u[field], (v) => isNum(v, 0, 1e15), (v) => {
+        target[field] = v;
+      });
+    });
+  }
+
+  if (override.offline && typeof override.offline === 'object') {
+    const o = override.offline;
+    take('offline.efficiency', o.efficiency, (v) => isNum(v, 0, 1), (v) => {
+      config.offline.efficiency = v;
+    });
+    take('offline.capSeconds', o.capSeconds, (v) => isNum(v, 60, 7 * 86_400), (v) => {
+      config.offline.capSeconds = v;
+    });
+    take('offline.minSeconds', o.minSeconds, (v) => isNum(v, 0, 600), (v) => {
+      config.offline.minSeconds = v;
+    });
+  }
+
+  return { config, rejected };
+}

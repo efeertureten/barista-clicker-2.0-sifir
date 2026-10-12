@@ -1,5 +1,6 @@
 import { readJSON, writeJSON } from '../lib/storage.js';
-import { INITIAL_STATE } from './economy.js';
+import { LEGACY_SHOP_THRESHOLDS } from './config.js';
+import { INITIAL_STATE, UPGRADE_IDS } from './economy.js';
 
 export const SAVE_KEY = 'barista-clicker-save-v1';
 
@@ -17,6 +18,14 @@ function loadOffline(offline) {
   };
 }
 
+// 2.1'den önceki kayıtlarda seviye yazılmazdı, fincan sayısından eski eşiklerle hesaplanırdı.
+// Eski oyuncu, yeni (daha yüksek) eşikler yüzünden ulaştığı dükkanı kaybetmesin diye o seviye korunur.
+function loadLevel(save) {
+  const max = LEGACY_SHOP_THRESHOLDS.length - 1;
+  if (Number.isInteger(save.level)) return Math.min(Math.max(save.level, 0), max);
+  return LEGACY_SHOP_THRESHOLDS.reduce((level, at, i) => (num(save.coffees) >= at ? i : level), 0);
+}
+
 // Kaydı okur ve doğrular: bozuk ya da elle değiştirilmiş değerler sıfıra çekilir
 export function loadSave(initialSave) {
   const save = initialSave || readJSON(SAVE_KEY);
@@ -26,11 +35,8 @@ export function loadSave(initialSave) {
     coffees: num(save.coffees),
     earned: num(save.earned),
     clicks: Math.floor(num(save.clicks)),
-    owned: {
-      beans: Math.floor(num(save.owned?.beans)),
-      machine: Math.floor(num(save.owned?.machine)),
-      barista: Math.floor(num(save.owned?.barista)),
-    },
+    owned: Object.fromEntries(UPGRADE_IDS.map((id) => [id, Math.floor(num(save.owned?.[id]))])),
+    level: loadLevel(save),
     offline: loadOffline(save.offline),
   };
 }

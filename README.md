@@ -13,7 +13,8 @@ Kahve demle, sat, dükkânını seyyar tezgâhtan kahve imparatorluğuna büyüt
 
 - Latteye tıkla, her tıklama kahve demler ve kasaya para koyar.
 - Marketten yükseltme al: tık başına daha çok kahve ya da sen tıklamazken çalışan otomatik üretim.
-- Toplam demlenen fincan sayısı arttıkça dükkânın büyür, büyüdükçe fincan başına satış fiyatı da artar.
+- Toplam demlenen fincan sayısı arttıkça dükkânın büyür, büyüdükçe fincan başına satış fiyatı da artar ve markette yeni bir üretici açılır.
+- Bir üreticiden 25, 50, 100, 150, 200 ve 300 adete ulaştığında o üreticinin üretimi her seferinde 2 katına çıkar.
 - Sen yokken de dükkân yarım hızla çalışır. Kazanç en çok 2 saat birikir; döndüğünde "Hoş geldin" kartından kasaya toplarsın. Bir dakikadan kısa ayrılıklar sayılmaz, üretim tam hızla devam eder.
 - İlerleme tarayıcıda otomatik kaydedilir.
 
@@ -22,21 +23,32 @@ Kahve demle, sat, dükkânını seyyar tezgâhtan kahve imparatorluğuna büyüt
 | | Sv. | Dükkân | Açıldığı an (toplam fincan) | Fincan fiyatı |
 |---|---|---|---|---|
 | <img src="src/barista-assets/shop-1-tezgah-thumb.webp" width="64" alt=""> | 1 | Seyyar Tezgâh | başlangıç | ₺1,00 |
-| <img src="src/barista-assets/shop-2-kose-kafe-thumb.webp" width="64" alt=""> | 2 | Köşe Kafe | 150 | ₺1,25 |
-| <img src="src/barista-assets/shop-3-mahalle-thumb.webp" width="64" alt=""> | 3 | Mahalle Kahvecisi | 1.500 | ₺1,50 |
-| <img src="src/barista-assets/shop-4-kavurma-thumb.webp" width="64" alt=""> | 4 | Kavurma Atölyesi | 15.000 | ₺2,00 |
-| <img src="src/barista-assets/shop-5-zincir-thumb.webp" width="64" alt=""> | 5 | Kahve Zinciri | 150.000 | ₺3,00 |
-| <img src="src/barista-assets/shop-6-imparatorluk-thumb.webp" width="64" alt=""> | 6 | Kahve İmparatorluğu | 2.000.000 | ₺5,00 |
+| <img src="src/barista-assets/shop-2-kose-kafe-thumb.webp" width="64" alt=""> | 2 | Köşe Kafe | 300 | ₺1,25 |
+| <img src="src/barista-assets/shop-3-mahalle-thumb.webp" width="64" alt=""> | 3 | Mahalle Kahvecisi | 12.000 | ₺1,50 |
+| <img src="src/barista-assets/shop-4-kavurma-thumb.webp" width="64" alt=""> | 4 | Kavurma Atölyesi | 400.000 | ₺2,00 |
+| <img src="src/barista-assets/shop-5-zincir-thumb.webp" width="64" alt=""> | 5 | Kahve Zinciri | 15 milyon | ₺3,00 |
+| <img src="src/barista-assets/shop-6-imparatorluk-thumb.webp" width="64" alt=""> | 6 | Kahve İmparatorluğu | 100 milyar | ₺5,00 |
+
+Ulaşılan seviye kayda yazılır ve hiç düşmez. 2.1'den önce oynamaya başlayan oyuncular, eski (daha düşük) eşiklerle kazandıkları dükkânı korur.
 
 ## Yükseltmeler
 
 Her alımda fiyat %15 artar. Bütün bu değerler `src/game/config.js` dosyasında.
 
-| | Yükseltme | Etki | Başlangıç fiyatı |
-|---|---|---|---|
-| <img src="src/barista-assets/upgrade-beans.webp" width="48" alt=""> | Daha İyi Çekirdek | +1 kahve / tık | ₺15 |
-| <img src="src/barista-assets/upgrade-machine.webp" width="48" alt=""> | Otomatik Espresso Makinesi | +1 kahve / sn | ₺60 |
-| <img src="src/barista-assets/upgrade-barista.webp" width="48" alt=""> | Deneyimli Barista | +10 kahve / sn | ₺500 |
+| | Yükseltme | Etki | Başlangıç fiyatı | Açıldığı dükkân |
+|---|---|---|---|---|
+| <img src="src/barista-assets/upgrade-beans.webp" width="48" alt=""> | Daha İyi Çekirdek | +1 kahve / tık | ₺15 | Sv.1 |
+| <img src="src/barista-assets/upgrade-machine.webp" width="48" alt=""> | Otomatik Espresso Makinesi | +1 kahve / sn | ₺60 | Sv.1 |
+| <img src="src/barista-assets/upgrade-barista.webp" width="48" alt=""> | Deneyimli Barista | +8 kahve / sn | ₺600 | Sv.1 |
+| <img src="src/barista-assets/upgrade-filter.webp" width="48" alt=""> | Filtre Kahve İstasyonu | +55 kahve / sn | ₺8.000 | Sv.2 |
+| <img src="src/barista-assets/upgrade-roaster.webp" width="48" alt=""> | Kavurma Makinesi | +380 kahve / sn | ₺110.000 | Sv.3 |
+| <img src="src/barista-assets/upgrade-truck.webp" width="48" alt=""> | Kahve Kamyoneti | +2.600 kahve / sn | ₺1,6 milyon | Sv.4 |
+| <img src="src/barista-assets/upgrade-dealers.webp" width="48" alt=""> | Bayi Ağı | +18.000 kahve / sn | ₺24 milyon | Sv.5 |
+| <img src="src/barista-assets/upgrade-plantation.webp" width="48" alt=""> | Kahve Plantasyonu | +130.000 kahve / sn | ₺400 milyon | Sv.6 |
+
+Markette açılmış yükseltmelerin yanında bir sonraki dükkânda açılacak üretici kilitli olarak görünür. Üretici kartlarında sonraki kilometre taşına ilerleme ve geçerli çarpan (×2, ×4…) yazar.
+
+Bu denge, günde 4 kısa oturum oynayan bir oyuncu için simülasyonla ayarlandı: Sv.5 ilk gün, Kahve İmparatorluğu 5. gün.
 
 ## 2.0'da neler yeni
 
@@ -70,10 +82,11 @@ npm run preview  # derlemeyi yerelde aç
 src/
   BaristaClicker.jsx     arayüz ve oyun döngüsü; aşağıdaki modülleri birbirine bağlar
   game/
-    config.js            ayarlanabilir bütün denge değerleri (fiyatlar, artış oranı, dükkân eşikleri, çevrimdışı kazanç)
+    config.js            ayarlanabilir bütün denge değerleri ve Remote Config doğrulaması (mergeConfig)
+    activeConfig.js      bu oturumun dengesi: varsayılan + Remote Config'ten en son gelen
     content.js           yükseltme ve dükkân adları, açıklamaları, görselleri
-    economy.js           saf oyun mantığı: tık, üretim, satın alma, seviye hesabı
-    save.js              oyun kaydını okuma, doğrulama ve yazma
+    economy.js           saf oyun mantığı: tık, üretim, satın alma, seviye, kilometre taşları
+    save.js              oyun kaydını okuma, doğrulama, eski kayıtları taşıma ve yazma
     meta.js              kurulum tarihi, oturum sayısı, oyun süresi, ilk deneyim adımları
     format.js            sayı ve para biçimleri
   audio/
@@ -81,8 +94,9 @@ src/
     sounds.js            ses dosyalarının listesi ve müzik döngü noktaları
   analytics/
     analytics.js         ölçüm katmanı: izin, olay sırası, Firebase ve hata ayıklama çıkışı
+    remoteConfig.js      Remote Config'ten "economy" parametresini indirir ve saklar
     firebaseConfig.js    Firebase yapılandırması (boşken hiçbir yere veri gitmez)
-  ui/                    stiller, ses düğmesi, veri izni bandı, Hoş geldin kartı
+  ui/                    stiller, market kartları, ses düğmesi, veri izni bandı, Hoş geldin kartı
   lib/                   localStorage ve dosya yolu yardımcıları
   barista-assets/        oyun görselleri (WebP)
   barista-sounds/        oyun sesleri (MP3)
@@ -92,6 +106,28 @@ docs/                    README ekran görüntüleri
 ```
 
 Oyun dengesini değiştirmek için yalnızca `src/game/config.js` dosyasına dokunmak yeter; `BaristaClicker` bileşeni farklı bir yapılandırmayı `config` özelliğiyle de alabilir. Bu, ileride değerleri Firebase Remote Config'ten çekip A/B testi yapmanın temeli.
+
+## Dengeyi uzaktan değiştirmek (Remote Config)
+
+Oyunun bütün sayıları Firebase Remote Config'teki tek bir **`economy`** parametresiyle, yeni sürüm yayınlamadan değiştirilebilir. Bu, A/B testlerinin temeli.
+
+1. Firebase konsolunda **Remote Config → Parametre oluştur**.
+2. Parametre adı `economy`, veri türü **JSON**.
+3. Değere yalnızca değişecek alanları yaz. Örneğin depo sınırını 4 saate çıkarıp makineyi güçlendirmek için:
+
+```json
+{
+  "version": "depo-4sa",
+  "offline": { "capSeconds": 14400 },
+  "upgrades": { "machine": { "cps": 2 } }
+}
+```
+
+- Alanların tamamı ve anlamları `src/game/config.js` içindeki `DEFAULT_CONFIG`'te. `version` her değişiklikte farklı bir ad olsun; ölçümde `economy_version` olarak görünür.
+- Her alan tek tek doğrulanır; geçersiz bir değer (örn. `"costGrowth": 5`) atlanır, gerisi uygulanır ve `config_rejected` olayı gönderilir. Oyun asla bozuk bir dengeyle açılmaz.
+- Değerler oyun sırasında indirilir ama **bir sonraki açılışta** uygulanır; fiyatlar oyuncunun gözü önünde değişmez. Aynı tarayıcı en fazla saatte bir sorar (`?debug=1` ile her açılışta).
+- Remote Config de yalnızca veri iznini veren oyuncularda çalışır; diğerleri varsayılan dengeyle oynar.
+- Parametreyi silmek her şeyi varsayılana döndürür.
 
 ## Ölçüm
 
@@ -111,11 +147,13 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `level_up` | dükkân büyüdüğünde | yeni seviye ve adı, toplam aktif oyun dakikası |
 | `spend_virtual_currency` | yükseltme alındığında | yükseltme, ödenen tutar, alımdan sonraki adet, dükkân seviyesi |
 | `settings_change` | ses ya da müzik açılıp kapatıldığında | ayar ve yeni değeri |
+| `milestone_reached` | bir üretici kilometre taşına ulaştığında | üretici, adet, yeni çarpan, dükkân seviyesi |
+| `config_rejected` | Remote Config'teki bazı alanlar geçersiz olduğu için atlandığında | atlanan alanlar |
 | `offline_collect` | "Hoş geldin" kartında kazanç toplandığında | uzakta kalınan dakika, depoya sayılan dakika, depo doldu mu, fincan, tutar, depo sınırı (saat) |
 | `game_reset` | oyun sıfırlandığında | sıfırlamadan önceki seviye, fincan ve tık sayısı |
 | `app_error` | yakalanmamış bir hata olduğunda | hata türü ve kısa mesajı |
 
-Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `max_shop_level`, `sound`, `music`. Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
+Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `economy_version` (oyuncunun hangi dengeyle oynadığı), `max_shop_level`, `sound`, `music`. Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
 
 ## Görseller ve sesler
 

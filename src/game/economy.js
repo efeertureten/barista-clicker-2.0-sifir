@@ -1,40 +1,64 @@
 // Oyun mantığı: saf fonksiyonlar, arayüzden bağımsız. Hepsi bir denge nesnesiyle (config.js) kurulur;
 // Remote Config geldiğinde aynı fonksiyonlar uzaktan gelen sayılarla çalışır.
 
+import { DEFAULT_CONFIG } from './config.js';
+
+// Yükseltmelerin kimlikleri içerikle (ad, görsel) sabittir; Remote Config yalnızca sayılarını değiştirir
+export const UPGRADE_IDS = Object.keys(DEFAULT_CONFIG.upgrades);
+export const emptyOwned = () => Object.fromEntries(UPGRADE_IDS.map((id) => [id, 0]));
+
 export const INITIAL_STATE = {
   money: 0, // kasadaki para
   coffees: 0, // toplam demlenen fincan
   earned: 0, // toplam kazanılan para
   clicks: 0,
-  owned: { beans: 0, machine: 0, barista: 0 },
+  owned: emptyOwned(),
+  // Ulaşılan en yüksek dükkan seviyesi (0'dan başlar). Fincan sayısından hesaplanır ama hiç düşmez:
+  // eşikler değişse bile (yeni denge, Remote Config) oyuncu kazandığı dükkanı kaybetmez.
+  level: 0,
   // Uzaktayken biriken, henüz toplanmamış üretim:
   // { coffees, seconds (depoya sayılan süre), away (gerçek uzak kalma süresi), capped (depo doldu mu) }
   offline: null,
 };
 
 export function createEconomy(config) {
-  const { shops, upgrades, costGrowth, offline } = config;
+  const { shops, upgrades, costGrowth, offline, milestones, milestoneMultiplier } = config;
 
-  const shopIndexOf = (coffees) => {
+  // Yalnızca fincan sayısına göre seviye
+  const levelFromCoffees = (coffees) => {
     let index = 0;
     shops.forEach((shop, i) => {
       if (coffees >= shop.at) index = i;
     });
     return index;
   };
+  const levelOf = (state) => Math.max(state.level ?? 0, levelFromCoffees(state.coffees));
 
-  const perClickOf = (owned) => 1 + owned.beans * upgrades.beans.perClick;
-  const cpsOf = (owned) => owned.machine * upgrades.machine.cps + owned.barista * upgrades.barista.cps;
-  const costOf = (id, owned) => Math.ceil(upgrades[id].baseCost * costGrowth ** owned[id]);
+  const isProducer = (id) => !('perClick' in upgrades[id]);
+  const isUnlocked = (id, level) => level + 1 >= upgrades[id].unlockLevel;
+  // Kaç kilometre taşı geçildi ve üretim kaç katına çıktı
+  const milestonesPassed = (count) => milestones.filter((m) => count >= m).length;
+  const multiplierOf = (id, count) => (isProducer(id) ? milestoneMultiplier ** milestonesPassed(count) : 1);
+  const nextMilestone = (count) => milestones.find((m) => count < m) ?? null;
+
+  const perClickOf = (owned) =>
+    1 + UPGRADE_IDS.reduce((sum, id) => sum + (upgrades[id].perClick ?? 0) * (owned[id] ?? 0), 0);
+  // Bir üreticinin tek biriminin şu anki üretimi (kilometre taşı çarpanı dahil)
+  const unitCpsOf = (id, owned) => (upgrades[id].cps ?? 0) * multiplierOf(id, owned[id] ?? 0);
+  const cpsOf = (owned) => UPGRADE_IDS.reduce((sum, id) => sum + unitCpsOf(id, owned) * (owned[id] ?? 0), 0);
+  const costOf = (id, owned) => Math.ceil(upgrades[id].baseCost * costGrowth ** (owned[id] ?? 0));
 
   function produce(state, amount) {
     if (amount <= 0) return state;
-    const income = amount * shops[shopIndexOf(state.coffees)].price;
+    const level = levelOf(state);
+    const income = amount * shops[level].price;
+    const coffees = state.coffees + amount;
     return {
       ...state,
       money: state.money + income,
-      coffees: state.coffees + amount,
+      coffees,
       earned: state.earned + income,
+      level: Math.max(level, levelFromCoffees(coffees)),
     };
   }
 
@@ -68,12 +92,13 @@ export function createEconomy(config) {
         return produce({ ...state, offline: null }, state.offline.coffees * (action.multiplier ?? 1));
       }
       case 'buy': {
+        if (!upgrades[action.id] || !isUnlocked(action.id, levelOf(state))) return state;
         const cost = costOf(action.id, state.owned);
         if (state.money < cost) return state;
         return {
           ...state,
           money: state.money - cost,
-          owned: { ...state.owned, [action.id]: state.owned[action.id] + 1 },
+          owned: { ...state.owned, [action.id]: (state.owned[action.id] ?? 0) + 1 },
         };
       }
       case 'reset':
@@ -83,5 +108,17 @@ export function createEconomy(config) {
     }
   }
 
-  return { shopIndexOf, perClickOf, cpsOf, costOf, reducer };
+  return {
+    levelOf,
+    levelFromCoffees,
+    isProducer,
+    isUnlocked,
+    multiplierOf,
+    nextMilestone,
+    perClickOf,
+    unitCpsOf,
+    cpsOf,
+    costOf,
+    reducer,
+  };
 }

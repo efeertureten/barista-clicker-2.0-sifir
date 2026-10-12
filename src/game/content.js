@@ -1,9 +1,15 @@
 // Oyunun metinleri ve görselleri. Sayılar config.js'ten gelir; build* fonksiyonları ikisini birleştirir,
 // böylece Remote Config bir fiyatı ya da üretimi değiştirdiğinde arayüzdeki metin de kendiliğinden güncellenir.
 
+import { Coffee, Flame, MapPinned, Sprout, Truck } from 'lucide-react';
 import beansUpgradeImg from '../barista-assets/upgrade-beans.webp';
 import machineUpgradeImg from '../barista-assets/upgrade-machine.webp';
 import baristaUpgradeImg from '../barista-assets/upgrade-barista.webp';
+import filterUpgradeImg from '../barista-assets/upgrade-filter.webp';
+import roasterUpgradeImg from '../barista-assets/upgrade-roaster.webp';
+import truckUpgradeImg from '../barista-assets/upgrade-truck.webp';
+import dealersUpgradeImg from '../barista-assets/upgrade-dealers.webp';
+import plantationUpgradeImg from '../barista-assets/upgrade-plantation.webp';
 import shop1Img from '../barista-assets/shop-1-tezgah.webp';
 import shop1Thumb from '../barista-assets/shop-1-tezgah-thumb.webp';
 import shop2Img from '../barista-assets/shop-2-kose-kafe.webp';
@@ -40,6 +46,47 @@ const UPGRADE_CONTENT = [
     sound: 'buyBarista',
     anchorBottom: true, // büst görseli kutunun alt kenarına oturur
   },
+  // Ekonomi 2.1 üreticileri. icon: image null yapılırsa (yeni bir üreticinin görseli henüz yokken) gösterilen yedek
+  {
+    id: 'filter',
+    name: 'Filtre Kahve İstasyonu',
+    desc: 'Yavaş demleme, hızlı satış. Sabah kuyruğunu tek başına eritir.',
+    image: filterUpgradeImg,
+    icon: Coffee,
+    sound: 'buyMachine',
+  },
+  {
+    id: 'roaster',
+    name: 'Kavurma Makinesi',
+    desc: 'Çekirdeği artık kendin kavuruyorsun. Mahalle bu kokuyu tanır.',
+    image: roasterUpgradeImg,
+    icon: Flame,
+    sound: 'buyMachine',
+  },
+  {
+    id: 'truck',
+    name: 'Kahve Kamyoneti',
+    desc: 'İskelelere, kampüslere, festivallere. Kahve müşteriye gider.',
+    image: truckUpgradeImg,
+    icon: Truck,
+    sound: 'buyBarista',
+  },
+  {
+    id: 'dealers',
+    name: 'Bayi Ağı',
+    desc: 'Şehrin dört bir yanında senin tarifinle açılan dükkanlar.',
+    image: dealersUpgradeImg,
+    icon: MapPinned,
+    sound: 'bell',
+  },
+  {
+    id: 'plantation',
+    name: 'Kahve Plantasyonu',
+    desc: 'Çekirdek kendi tarlandan. Fidandan fincana her şey senin.',
+    image: plantationUpgradeImg,
+    icon: Sprout,
+    sound: 'buyBeans',
+  },
 ];
 
 // tint: sahne görselinin zemin rengi; görsel yüklenirken ve geçişte boşluk görünmesin diye
@@ -52,14 +99,10 @@ const SHOP_CONTENT = [
   { name: 'Kahve İmparatorluğu', image: shop6Img, thumb: shop6Thumb, tint: '#f1ddc0' },
 ];
 
-const effectText = (balance) =>
-  balance.perClick ? `+${balance.perClick} kahve / tık` : `+${balance.cps} kahve / sn`;
-
+// İçerik + denge sayıları (baseCost, cps ya da perClick, unlockLevel). Etki metni arayüzde,
+// kilometre taşı çarpanıyla birlikte hesaplanır.
 export function buildUpgrades(config) {
-  return UPGRADE_CONTENT.map((content) => {
-    const balance = config.upgrades[content.id];
-    return { ...content, baseCost: balance.baseCost, effect: effectText(balance) };
-  });
+  return UPGRADE_CONTENT.map((content) => ({ ...content, ...config.upgrades[content.id] }));
 }
 
 export function buildShops(config) {
