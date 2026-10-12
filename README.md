@@ -45,7 +45,9 @@ Her alımda fiyat %15 artar.
 - "Dükkân büyüdü" bildiriminde yeni dükkânın küçük resmi var.
 - Alınamayan yükseltmeler gri görünüyor, alınabilir hale gelince zıplıyor.
 - Arka planda kahve çizimli bir doku var; geniş ekranda kart ile fincan yan yana diziliyor.
-- Sesler: her tıklamada fincana kaşık ve kahve damlası, her yükseltmenin kendi satın alma sesi, dükkân büyüyünce kapı zili ve kutlama melodisi, son seviyede fanfar, bir yükseltme alınabilir hale gelince ince belli bardak "ting"i. Sesler alttaki düğmeyle kapatılabiliyor, tercih hatırlanıyor.
+- Sesler: her tıklamada kahve damlası ve altında yumuşak bir kaşık sesi, her yükseltmenin kendi satın alma sesi, dükkân büyüyünce kapı zili ve kutlama melodisi, son seviyede fanfar, bir yükseltme alınabilir hale gelince ince belli bardak "ting"i.
+- Arka plan müziği: ilk açılışta girişiyle başlar, sonra kesintisiz döngüye girer; dükkân büyürken kutlama duyulsun diye kısılır, sekme arka plandayken durur.
+- Alttaki **Ses** ve **Müzik** düğmeleriyle ikisi ayrı ayrı kapatılabiliyor, tercih hatırlanıyor.
 - Hareket azaltma (`prefers-reduced-motion`) açıkken animasyonlar kapanıyor.
 
 ## Yerelde çalıştırma
@@ -77,4 +79,4 @@ Bileşen başka bir React projesine de taşınabilir: `BaristaClicker.jsx` ile `
 
 ## Görseller ve sesler
 
-Bütün görseller ve sesler Google Gemini ile üretildi. Nesnelerin yeşil zeminleri temizlenip şeffaf yapıldı, dükkân sahneleri aynı ölçekte kırpıldı; böylece dükkân büyüdükçe sahne de büyüyor. Ses efektleri Gemini'nin ürettiği parçaların tekil vuruşlarından kesildi, seviyeleri birbirine göre dengelendi. Tarayıcılar ilk etkileşimden önce ses çalmaya izin vermediği için sesler ilk tıklamayla başlar.
+Bütün görseller ve sesler Google Gemini ile üretildi. Nesnelerin yeşil zeminleri temizlenip şeffaf yapıldı, dükkân sahneleri aynı ölçekte kırpıldı; böylece dükkân büyüdükçe sahne de büyüyor. Ses efektleri Gemini'nin ürettiği parçaların tekil vuruşlarından kesildi, seviyeleri birbirine göre dengelendi. Müzik döngüsü, parçanın kendini tekrar eden iki bölümü arasından kuruldu ve dikiş noktası yumuşak geçişle birleştirildi; döngü noktaları `BaristaClicker.jsx` içindeki `MUSIC_TRACK` sabitinde. Tarayıcılar ilk etkileşimden önce ses çalmaya izin vermediği için sesler ilk tıklamayla başlar; müzik dosyası da sayfa açılışını yavaşlatmasın diye ancak o zaman indirilir.

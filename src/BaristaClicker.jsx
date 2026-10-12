@@ -1,6 +1,7 @@
 import React, { useEffect, useReducer, useRef, useState } from 'react';
 import {
   MousePointerClick,
+  Music,
   RotateCcw,
   ShoppingBag,
   Sparkles,
@@ -47,6 +48,7 @@ import levelUpSfx from './barista-sounds/level-up.mp3';
 import empireSfx from './barista-sounds/empire.mp3';
 import ting1 from './barista-sounds/ting-1.mp3';
 import ting2 from './barista-sounds/ting-2.mp3';
+import musicLoop from './barista-sounds/music-loop.mp3';
 
 // Vite/CRA görsel importunu URL olarak, Next.js ise { src } nesnesi olarak verir; ikisini de destekle.
 const src = (asset) => (typeof asset === 'string' ? asset : asset?.src ?? '');
@@ -63,7 +65,12 @@ const SOUNDS = {
   empire: [empireSfx], // son seviye: zilin ardından
   ting: [ting1, ting2], // bir yükseltme alınabilir hale geldi
 };
+// Arka plan müziği: ilk çalışta girişten başlar, sonra [loopStart, loopEnd) arası kesintisiz döner.
+// Döngü noktaları (sn) dosyadaki kendini tekrar eden bölümden ölçüldü; dosya değişirse yeniden ölçülmeli.
+const MUSIC_TRACK = { src: musicLoop, loopStart: 36.3829, loopEnd: 146.5467 };
+
 const SOUND_PREF_KEY = 'barista-clicker-sound-v1';
+const MUSIC_PREF_KEY = 'barista-clicker-music-v1';
 
 /* ------------------------------------------------------------------ */
 /*  Oyun verileri                                                      */
@@ -215,11 +222,19 @@ function loadSave(initialSave) {
 /*  Ses                                                                */
 /* ------------------------------------------------------------------ */
 
-function readSoundPref() {
+function readPref(key) {
   try {
-    return window.localStorage.getItem(SOUND_PREF_KEY) !== 'off';
+    return window.localStorage.getItem(key) !== 'off';
   } catch {
     return true;
+  }
+}
+
+function writePref(key, on) {
+  try {
+    window.localStorage.setItem(key, on ? 'on' : 'off');
+  } catch {
+    /* depolama kapalıysa sessizce geç */
   }
 }
 
@@ -250,23 +265,37 @@ function trimLeadingSilence(ctx, buffer, threshold = 0.002) {
 }
 
 // Web Audio üstünde küçük bir ses motoru. Tarayıcılar ilk etkileşimden önce ses çalmaya izin vermez;
-// bu yüzden AudioContext ilk dokunuşta (unlock) kurulur, dosyalar ise önceden indirilir (warm).
-function createSoundEngine(files) {
+// bu yüzden AudioContext ilk dokunuşta (unlock) kurulur. Efekt dosyaları önceden indirilir (warm),
+// müzik ise ancak ilk etkileşimden sonra indirilir: büyük dosya, sayfa açılışını yavaşlatmasın.
+const MUSIC_LEVEL = 0.5; // müziğin efektlere göre seviyesi
+const DUCK_LEVEL = 0.3; // dükkan büyürken müzik bu orana iner
+
+function createSoundEngine(files, musicTrack) {
   const bytes = {};
   const buffers = {};
+  const decoding = new Set();
   const voices = {};
   const lastStart = {};
   const lastIndex = {};
   let pending = []; // ses henüz çözülmemişken gelen istekler (ör. oyunun ilk tıklaması)
   let ctx = null;
   let master = null;
-  let enabled = true;
+  let sfxBus = null;
+  let musicBus = null;
+  let sfxOn = true;
+  let musicOn = false;
+  let musicBytes = null;
+  let musicBuffer = null;
+  let musicLoading = false;
+  let musicVoice = null;
+  let musicStartedOnce = false;
   let disposed = false;
 
+  const wanted = () => sfxOn || musicOn;
+
   const warm = () => {
-    if (Object.keys(bytes).length > 0) return;
     Object.entries(files).forEach(([name, urls]) => {
-      bytes[name] = urls.map((url) => loadBytes(src(url)).catch(() => null));
+      if (!bytes[name]) bytes[name] = urls.map((url) => loadBytes(src(url)).catch(() => null));
     });
   };
 
@@ -275,9 +304,11 @@ function createSoundEngine(files) {
   const decodeAll = () =>
     Promise.all(
       Object.entries(bytes).map(async ([name, list]) => {
+        if (buffers[name] || decoding.has(name)) return;
+        decoding.add(name);
         const decoded = await Promise.all(
-          list.map(async (pending) => {
-            const data = await pending;
+          list.map(async (request) => {
+            const data = await request;
             if (!data || disposed) return null;
             try {
               return trimLeadingSilence(ctx, await decode(data.slice(0)));
@@ -287,6 +318,7 @@ function createSoundEngine(files) {
           }),
         );
         buffers[name] = decoded.filter(Boolean);
+        decoding.delete(name);
         flushPending();
       }),
     );
@@ -304,8 +336,87 @@ function createSoundEngine(files) {
     });
   };
 
+  const fadeOut = (voice, seconds = 0.04) => {
+    const now = ctx.currentTime;
+    try {
+      voice.gain.gain.cancelScheduledValues(now);
+      voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
+      voice.gain.gain.linearRampToValueAtTime(0, now + seconds);
+      voice.source.stop(now + seconds + 0.01);
+    } catch {
+      /* ses zaten bitmiş */
+    }
+  };
+
+  /* ---- Müzik ---- */
+
+  const loadMusic = async () => {
+    if (!musicTrack || musicBuffer || musicLoading || !ctx) return;
+    musicLoading = true;
+    try {
+      if (!musicBytes) musicBytes = loadBytes(src(musicTrack.src)).catch(() => null);
+      const data = await musicBytes;
+      // Baştaki kodlayıcı boşluğu da kırpılır; döngü noktaları kırpılmış dosyaya göre hesaplandı
+      if (data && !disposed) musicBuffer = trimLeadingSilence(ctx, await decode(data.slice(0)));
+    } catch {
+      /* müzik yüklenemezse oyun sessiz müzikle devam eder */
+    }
+    musicLoading = false;
+    startMusic();
+  };
+
+  const startMusic = () => {
+    if (!ctx || !musicOn || musicVoice || disposed) return;
+    if (!musicBuffer) {
+      loadMusic();
+      return;
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = musicBuffer;
+    source.loop = true;
+    source.loopStart = musicTrack.loopStart;
+    source.loopEnd = Math.min(musicTrack.loopEnd, musicBuffer.duration);
+    const gain = ctx.createGain();
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(1, now + 2);
+    source.connect(gain);
+    gain.connect(musicBus);
+    // İlk seferde parçanın girişiyle başla; kapatılıp yeniden açılırsa doğrudan döngüden devam et
+    source.start(now, musicStartedOnce ? musicTrack.loopStart : 0);
+    musicStartedOnce = true;
+    musicVoice = { source, gain };
+  };
+
+  const stopMusic = () => {
+    if (!musicVoice) return;
+    fadeOut(musicVoice, 0.6);
+    musicVoice = null;
+  };
+
+  // Kutlama sesleri çalarken müziği kıs, sonra yavaşça geri getir
+  const duckMusic = (seconds) => {
+    if (!ctx || !musicBus) return;
+    const level = musicBus.gain;
+    const now = ctx.currentTime;
+    level.cancelScheduledValues(now);
+    level.setValueAtTime(level.value, now);
+    level.linearRampToValueAtTime(MUSIC_LEVEL * DUCK_LEVEL, now + 0.15);
+    level.setValueAtTime(MUSIC_LEVEL * DUCK_LEVEL, now + seconds);
+    level.linearRampToValueAtTime(MUSIC_LEVEL, now + seconds + 1.5);
+  };
+
+  /* ---- Yaşam döngüsü ---- */
+
+  // Sekme gizlenince her şeyi duraklat, geri gelince sürdür
+  const onVisibility = () => {
+    if (!ctx || disposed) return;
+    if (document.hidden) ctx.suspend().catch(() => {});
+    else if (wanted()) ctx.resume().catch(() => {});
+  };
+
   const unlock = () => {
-    if (disposed || !enabled || typeof window === 'undefined') return;
+    if (disposed || !wanted() || typeof window === 'undefined') return;
     if (!ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
@@ -317,30 +428,27 @@ function createSoundEngine(files) {
       master = ctx.createGain();
       master.gain.value = 0.85;
       master.connect(ctx.destination);
+      sfxBus = ctx.createGain();
+      sfxBus.connect(master);
+      musicBus = ctx.createGain();
+      musicBus.gain.value = MUSIC_LEVEL;
+      musicBus.connect(master);
       ctx.addEventListener?.('statechange', flushPending);
-      warm();
-      decodeAll();
+      document.addEventListener('visibilitychange', onVisibility);
+      if (sfxOn) {
+        warm();
+        decodeAll();
+      }
     }
-    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-  };
-
-  const fadeOut = (voice) => {
-    const now = ctx.currentTime;
-    try {
-      voice.gain.gain.cancelScheduledValues(now);
-      voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
-      voice.gain.gain.linearRampToValueAtTime(0, now + 0.04);
-      voice.source.stop(now + 0.05);
-    } catch {
-      /* ses zaten bitmiş */
-    }
+    if (ctx.state !== 'running' && !document.hidden) ctx.resume().catch(() => {});
+    startMusic();
   };
 
   // vary: çalma hızında ± rastgele sapma (aynı ses tekrar tekrar duyulunca kulak yorulmasın)
   // minGap: aynı sesin iki çalışı arasındaki en kısa süre; maxVoices: aynı anda en fazla kaç kopya
   const play = (name, options = {}) => {
     const { volume = 1, vary = 0, minGap = 0, maxVoices = 4, delay = 0 } = options;
-    if (!enabled || !ctx) return;
+    if (!sfxOn || !ctx) return;
     const list = buffers[name];
     if (!list || ctx.state !== 'running') {
       if (pending.length < 8) pending.push({ name, options, at: performance.now() });
@@ -364,7 +472,7 @@ function createSoundEngine(files) {
     const gain = ctx.createGain();
     gain.gain.value = volume;
     source.connect(gain);
-    gain.connect(master);
+    gain.connect(sfxBus);
     const voice = { source, gain };
     source.onended = () => {
       const i = active.indexOf(voice);
@@ -375,22 +483,30 @@ function createSoundEngine(files) {
     active.push(voice);
   };
 
-  const setEnabled = (value) => {
-    enabled = value;
+  const setSfx = (value) => {
+    sfxOn = value;
     if (value) {
       warm();
+      if (ctx) decodeAll();
       return;
     }
     pending = [];
-    if (ctx) Object.values(voices).forEach((list) => list.splice(0).forEach(fadeOut));
+    if (ctx) Object.values(voices).forEach((list) => list.splice(0).forEach((voice) => fadeOut(voice)));
+  };
+
+  const setMusic = (value) => {
+    musicOn = value;
+    if (value) startMusic();
+    else stopMusic();
   };
 
   const dispose = () => {
     disposed = true;
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility);
     ctx?.close().catch(() => {});
   };
 
-  return { warm, unlock, play, setEnabled, dispose };
+  return { unlock, play, setSfx, setMusic, duckMusic, dispose };
 }
 
 // Her tıklamada fincandan fırlayan çekirdekler (çoğunlukla yukarı doğru)
@@ -477,8 +593,28 @@ const STYLES = `
 `;
 
 /* ------------------------------------------------------------------ */
-/*  Bileşen                                                            */
+/*  Bileşenler                                                         */
 /* ------------------------------------------------------------------ */
+
+// Ses / Müzik aç-kapa düğmesi: kapalıyken soluk, kesik çerçeveli ve üstü çizili
+function AudioToggle({ on, onClick, label, icon: Icon }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      title={`${label} ${on ? 'açık' : 'kapalı'}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)] ${
+        on
+          ? 'border-[var(--line)] bg-[var(--milk)] text-[var(--roast)] hover:border-[var(--crema)] hover:text-[var(--ink)]'
+          : 'border-dashed border-[var(--line)] bg-transparent text-[var(--muted)] hover:text-[var(--roast)]'
+      }`}
+    >
+      <Icon size={14} strokeWidth={2.2} aria-hidden="true" className={on ? '' : 'opacity-60'} />
+      <span className={on ? '' : 'line-through decoration-1'}>{label}</span>
+    </button>
+  );
+}
 
 // Not: Kök eleman h-full kullanır; ebeveyni tam yükseklikte olmalı (ya da h-screen'e çevir).
 export default function BaristaClicker({ initialSave, onSave } = {}) {
@@ -487,7 +623,8 @@ export default function BaristaClicker({ initialSave, onSave } = {}) {
   const [bump, setBump] = useState(0);
   const [toast, setToast] = useState(null);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [soundOn, setSoundOn] = useState(readSoundPref);
+  const [soundOn, setSoundOn] = useState(() => readPref(SOUND_PREF_KEY));
+  const [musicOn, setMusicOn] = useState(() => readPref(MUSIC_PREF_KEY));
 
   const stateRef = useRef(state);
   const onSaveRef = useRef(onSave);
@@ -551,7 +688,7 @@ export default function BaristaClicker({ initialSave, onSave } = {}) {
 
   // Ses motoru: bileşenle birlikte kurulur ve kapanır
   useEffect(() => {
-    const engine = createSoundEngine(SOUNDS);
+    const engine = createSoundEngine(SOUNDS, MUSIC_TRACK);
     soundRef.current = engine;
     return () => {
       engine.dispose();
@@ -559,15 +696,16 @@ export default function BaristaClicker({ initialSave, onSave } = {}) {
     };
   }, []);
 
-  // Ses tercihi: motora ilet ve bu tarayıcıda hatırla
+  // Ses ve müzik tercihleri: motora ilet ve bu tarayıcıda hatırla
   useEffect(() => {
-    soundRef.current?.setEnabled(soundOn);
-    try {
-      window.localStorage.setItem(SOUND_PREF_KEY, soundOn ? 'on' : 'off');
-    } catch {
-      /* depolama kapalıysa sessizce geç */
-    }
+    soundRef.current?.setSfx(soundOn);
+    writePref(SOUND_PREF_KEY, soundOn);
   }, [soundOn]);
+
+  useEffect(() => {
+    soundRef.current?.setMusic(musicOn);
+    writePref(MUSIC_PREF_KEY, musicOn);
+  }, [musicOn]);
 
   // Bir yükseltme yeni alınabilir hale geldiğinde ince bir "ting"
   const affordableRef = useRef(null);
@@ -587,6 +725,7 @@ export default function BaristaClicker({ initialSave, onSave } = {}) {
     prevShop.current = shopIndex;
     if (shopIndex > prev) {
       const isFinal = shopIndex === SHOPS.length - 1;
+      soundRef.current?.duckMusic(isFinal ? 9.5 : 5.5);
       soundRef.current?.play('bell', { maxVoices: 1 });
       soundRef.current?.play(isFinal ? 'empire' : 'levelUp', { delay: 0.3, maxVoices: 1 });
       setToast(SHOPS[shopIndex]);
@@ -645,11 +784,19 @@ export default function BaristaClicker({ initialSave, onSave } = {}) {
     timers.current.add(t);
   };
 
+  // Motor hemen güncellenir (efekt beklemeden), çünkü tarayıcı sesi yalnızca bu tıklama içinde açmaya izin verir
   const toggleSound = () => {
     const next = !soundOn;
-    soundRef.current?.setEnabled(next);
+    soundRef.current?.setSfx(next);
     if (next) unlockAudio();
     setSoundOn(next);
+  };
+
+  const toggleMusic = () => {
+    const next = !musicOn;
+    soundRef.current?.setMusic(next);
+    if (next) unlockAudio();
+    setMusicOn(next);
   };
 
   const handleReset = () => {
@@ -867,19 +1014,10 @@ export default function BaristaClicker({ initialSave, onSave } = {}) {
           <p className="min-w-0 text-xs text-[var(--muted)]">
             {fmt(state.clicks)} tık · İlerlemen bu tarayıcıda otomatik kaydedilir.
           </p>
-          <button
-            type="button"
-            onClick={toggleSound}
-            aria-pressed={soundOn}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--milk)] px-3 py-1.5 text-xs font-semibold text-[var(--roast)] transition hover:border-[var(--crema)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)]"
-          >
-            {soundOn ? (
-              <Volume2 size={14} strokeWidth={2.2} aria-hidden="true" />
-            ) : (
-              <VolumeX size={14} strokeWidth={2.2} aria-hidden="true" />
-            )}
-            {soundOn ? 'Ses açık' : 'Ses kapalı'}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <AudioToggle on={soundOn} onClick={toggleSound} label="Ses" icon={soundOn ? Volume2 : VolumeX} />
+            <AudioToggle on={musicOn} onClick={toggleMusic} label="Müzik" icon={Music} />
+          </div>
         </div>
       </main>
 
