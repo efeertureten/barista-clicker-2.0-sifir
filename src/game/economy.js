@@ -7,10 +7,13 @@ export const INITIAL_STATE = {
   earned: 0, // toplam kazanılan para
   clicks: 0,
   owned: { beans: 0, machine: 0, barista: 0 },
+  // Uzaktayken biriken, henüz toplanmamış üretim:
+  // { coffees, seconds (depoya sayılan süre), away (gerçek uzak kalma süresi), capped (depo doldu mu) }
+  offline: null,
 };
 
 export function createEconomy(config) {
-  const { shops, upgrades, costGrowth } = config;
+  const { shops, upgrades, costGrowth, offline } = config;
 
   const shopIndexOf = (coffees) => {
     let index = 0;
@@ -41,6 +44,29 @@ export function createEconomy(config) {
         return { ...produce(state, perClickOf(state.owned)), clicks: state.clicks + 1 };
       case 'tick':
         return produce(state, cpsOf(state.owned) * action.dt);
+      // Oyuncu action.seconds boyunca uzaktaydı: üretimin bir kısmı depoda birikir, depo dolunca durur.
+      // Toplanmamış birikim varsa üstüne eklenir; depo sınırı ikisinin toplamına uygulanır.
+      case 'away': {
+        const prev = state.offline;
+        const stored = prev?.seconds ?? 0;
+        const seconds = Math.min(action.seconds, Math.max(0, offline.capSeconds - stored));
+        const coffees = cpsOf(state.owned) * offline.efficiency * seconds;
+        if (coffees <= 0 && !prev) return state;
+        return {
+          ...state,
+          offline: {
+            coffees: (prev?.coffees ?? 0) + coffees,
+            seconds: stored + seconds,
+            away: (prev?.away ?? 0) + action.seconds,
+            capped: stored + action.seconds >= offline.capSeconds,
+          },
+        };
+      }
+      // Birikeni kasaya aktar. multiplier: ileride ödüllü reklamla "2 kat topla" için
+      case 'collectOffline': {
+        if (!state.offline) return state;
+        return produce({ ...state, offline: null }, state.offline.coffees * (action.multiplier ?? 1));
+      }
       case 'buy': {
         const cost = costOf(action.id, state.owned);
         if (state.money < cost) return state;

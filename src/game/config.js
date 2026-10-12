@@ -2,7 +2,7 @@
 // alanlarını uzaktan değiştirecek; bu yüzden içinde metin ya da görsel yok, yalnızca sayılar var.
 // Metinler ve görseller content.js'te, bu sayılarla birleştirilerek kullanılır.
 
-export const APP_VERSION = '2.0.1';
+export const APP_VERSION = '2.0.2';
 
 export const DEFAULT_CONFIG = {
   // Her alımda yükseltmenin fiyatı bu katsayıyla çarpılır (1.15 = %15 artış)
@@ -24,4 +24,13 @@ export const DEFAULT_CONFIG = {
     { at: 150000, price: 3 },
     { at: 2000000, price: 5 },
   ],
+
+  // Oyuncu yokken (sekme arka planda ya da oyun kapalı) dükkan çalışmaya devam eder:
+  // efficiency: normal üretimin oranı · capSeconds: en çok kaç saniyelik üretim birikir (depo)
+  // minSeconds: bundan kısa ayrılıklar "uzakta" sayılmaz, üretim tam hızla eklenir
+  offline: {
+    efficiency: 0.5,
+    capSeconds: 2 * 3600,
+    minSeconds: 60,
+  },
 };

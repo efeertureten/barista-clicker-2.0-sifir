@@ -14,6 +14,7 @@ Kahve demle, sat, dükkânını seyyar tezgâhtan kahve imparatorluğuna büyüt
 - Latteye tıkla, her tıklama kahve demler ve kasaya para koyar.
 - Marketten yükseltme al: tık başına daha çok kahve ya da sen tıklamazken çalışan otomatik üretim.
 - Toplam demlenen fincan sayısı arttıkça dükkânın büyür, büyüdükçe fincan başına satış fiyatı da artar.
+- Sen yokken de dükkân yarım hızla çalışır. Kazanç en çok 2 saat birikir; döndüğünde "Hoş geldin" kartından kasaya toplarsın. Bir dakikadan kısa ayrılıklar sayılmaz, üretim tam hızla devam eder.
 - İlerleme tarayıcıda otomatik kaydedilir.
 
 ## Dükkân seviyeleri
@@ -69,7 +70,7 @@ npm run preview  # derlemeyi yerelde aç
 src/
   BaristaClicker.jsx     arayüz ve oyun döngüsü; aşağıdaki modülleri birbirine bağlar
   game/
-    config.js            ayarlanabilir bütün denge değerleri (fiyatlar, artış oranı, dükkân eşikleri)
+    config.js            ayarlanabilir bütün denge değerleri (fiyatlar, artış oranı, dükkân eşikleri, çevrimdışı kazanç)
     content.js           yükseltme ve dükkân adları, açıklamaları, görselleri
     economy.js           saf oyun mantığı: tık, üretim, satın alma, seviye hesabı
     save.js              oyun kaydını okuma, doğrulama ve yazma
@@ -81,7 +82,7 @@ src/
   analytics/
     analytics.js         ölçüm katmanı: izin, olay sırası, Firebase ve hata ayıklama çıkışı
     firebaseConfig.js    Firebase yapılandırması (boşken hiçbir yere veri gitmez)
-  ui/                    stiller, ses düğmesi, veri izni bandı
+  ui/                    stiller, ses düğmesi, veri izni bandı, Hoş geldin kartı
   lib/                   localStorage ve dosya yolu yardımcıları
   barista-assets/        oyun görselleri (WebP)
   barista-sounds/        oyun sesleri (MP3)
@@ -110,6 +111,7 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `level_up` | dükkân büyüdüğünde | yeni seviye ve adı, toplam aktif oyun dakikası |
 | `spend_virtual_currency` | yükseltme alındığında | yükseltme, ödenen tutar, alımdan sonraki adet, dükkân seviyesi |
 | `settings_change` | ses ya da müzik açılıp kapatıldığında | ayar ve yeni değeri |
+| `offline_collect` | "Hoş geldin" kartında kazanç toplandığında | uzakta kalınan dakika, depoya sayılan dakika, depo doldu mu, fincan, tutar, depo sınırı (saat) |
 | `game_reset` | oyun sıfırlandığında | sıfırlamadan önceki seviye, fincan ve tık sayısı |
 | `app_error` | yakalanmamış bir hata olduğunda | hata türü ve kısa mesajı |
 

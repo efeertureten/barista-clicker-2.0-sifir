@@ -18,7 +18,7 @@ import { readPref, writePref } from './lib/storage.js';
 import { APP_VERSION, DEFAULT_CONFIG } from './game/config.js';
 import { buildShops, buildUpgrades } from './game/content.js';
 import { createEconomy } from './game/economy.js';
-import { hasSave, loadSave, writeSave } from './game/save.js';
+import { hasSave, loadSave, readLastActiveAt, writeSave } from './game/save.js';
 import { createMeta } from './game/meta.js';
 import { fmt, fmtMoney, fmtPercent, fmtPrice, fmtRate } from './game/format.js';
 import { createSoundEngine } from './audio/soundEngine.js';
@@ -27,6 +27,7 @@ import * as analytics from './analytics/analytics.js';
 import { STYLES } from './ui/styles.js';
 import AudioToggle from './ui/AudioToggle.jsx';
 import ConsentBanner from './ui/ConsentBanner.jsx';
+import WelcomeBack from './ui/WelcomeBack.jsx';
 
 // Büyük sahne görseli yalnızca dikey yer olduğunda (geniş ekranda yan yana düzen ya da uzun ekran) görünür;
 // diğer durumlarda dükkan adının yanında küçük resim gösterilir, böylece fincan ekranın altına itilmez.
@@ -73,6 +74,9 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
   const timers = useRef(new Set());
   const soundRef = useRef(null);
   const metaRef = useRef(null);
+  // Üretimin en son hesaba katıldığı an. Kayıttan gelir; böylece oyun kapalıyken geçen süre de bilinir.
+  const activeAtRef = useRef(null);
+  if (activeAtRef.current === null) activeAtRef.current = readLastActiveAt(initialSave) ?? Date.now();
   stateRef.current = state;
   onSaveRef.current = onSave;
 
@@ -144,21 +148,25 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
     setConsentOpen(false);
   };
 
-  // Oyun döngüsü: geçen gerçek süreye göre üretim (arka planda kısılan sekmelerde de doğru çalışır)
+  // Oyun döngüsü: üretim yalnızca sekme görünürken tam hızla işler. Sekme arka plandayken saat ilerlemez;
+  // geri dönülünce (ya da oyun yeniden açılınca) aradaki süre tek seferde hesaplanır:
+  // kısa ayrılık tam hızla eklenir, uzun ayrılık "uzakta" sayılır ve depoya yarım hızla birikir.
+  const minAwaySeconds = config.offline.minSeconds;
   useEffect(() => {
-    let last = performance.now();
     const id = setInterval(() => {
-      const now = performance.now();
-      const dt = Math.min((now - last) / 1000, 3600);
-      last = now;
-      dispatch({ type: 'tick', dt });
+      if (document.hidden) return;
+      const now = Date.now();
+      const dt = (now - activeAtRef.current) / 1000;
+      activeAtRef.current = now;
+      if (dt <= 0) return; // saat geri alındıysa bu adımı atla
+      dispatch(dt < minAwaySeconds ? { type: 'tick', dt } : { type: 'away', seconds: dt });
     }, 100);
     return () => clearInterval(id);
-  }, []);
+  }, [minAwaySeconds]);
 
   // Otomatik kayıt
   useEffect(() => {
-    const save = () => writeSave(stateRef.current);
+    const save = () => writeSave(stateRef.current, activeAtRef.current);
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') save();
     };
@@ -322,6 +330,26 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
       shop_level: shopIndex + 1,
     });
     markFtue('first_purchase', 2);
+  };
+
+  // Hoş geldin kartı: uzaktayken biriken üretimi kasaya aktar
+  const handleCollectOffline = () => {
+    const pending = state.offline;
+    if (!pending) return;
+    unlockAudio();
+    dispatch({ type: 'collectOffline' });
+    sfx('ting', { maxVoices: 1 });
+    sfx('drip', { delay: 0.08, maxVoices: 2 });
+    analytics.track('offline_collect', {
+      away_minutes: Math.round(pending.away / 60),
+      stored_minutes: Math.round(pending.seconds / 60),
+      capped: pending.capped,
+      coffees: Math.round(pending.coffees),
+      value: Math.round(pending.coffees * shop.price),
+      doubled: false,
+      cap_hours: config.offline.capSeconds / 3600,
+      shop_level: shopIndex + 1,
+    });
   };
 
   const handleReset = () => {
@@ -691,6 +719,17 @@ export default function BaristaClicker({ initialSave, onSave, config = DEFAULT_C
             </div>
           </div>
         </div>
+      )}
+
+      {/* ---------------- Hoş geldin: uzaktayken biriken üretim ---------------- */}
+      {state.offline && (
+        <WelcomeBack
+          pending={state.offline}
+          shop={shop}
+          efficiency={config.offline.efficiency}
+          capSeconds={config.offline.capSeconds}
+          onCollect={handleCollectOffline}
+        />
       )}
 
       {/* ---------------- Veri izni ---------------- */}

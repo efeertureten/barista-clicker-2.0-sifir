@@ -63,8 +63,10 @@ export const STYLES = `
 @keyframes bc-toast { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes bc-scene-in { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: scale(1); } }
 @keyframes bc-pop { 0% { transform: scale(0.82); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.bc-rise { animation: bc-rise 0.45s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
+@keyframes bc-rise { from { opacity: 0; transform: translateY(24px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (prefers-reduced-motion: reduce) {
-  .bc-bob, .bc-ring, .bc-toast, .bc-scene-in, .bc-pop { animation: none; }
+  .bc-bob, .bc-ring, .bc-toast, .bc-scene-in, .bc-pop, .bc-rise { animation: none; }
   .bc-bean { display: none; }
   .bc-float { animation: bc-fade 0.9s ease-out forwards; }
 }
