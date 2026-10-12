@@ -45,6 +45,7 @@ Her alımda fiyat %15 artar.
 - "Dükkân büyüdü" bildiriminde yeni dükkânın küçük resmi var.
 - Alınamayan yükseltmeler gri görünüyor, alınabilir hale gelince zıplıyor.
 - Arka planda kahve çizimli bir doku var; geniş ekranda kart ile fincan yan yana diziliyor.
+- Sesler: her tıklamada fincana kaşık ve kahve damlası, her yükseltmenin kendi satın alma sesi, dükkân büyüyünce kapı zili ve kutlama melodisi, son seviyede fanfar, bir yükseltme alınabilir hale gelince ince belli bardak "ting"i. Sesler alttaki düğmeyle kapatılabiliyor, tercih hatırlanıyor.
 - Hareket azaltma (`prefers-reduced-motion`) açıkken animasyonlar kapanıyor.
 
 ## Yerelde çalıştırma
@@ -64,15 +65,16 @@ npm run preview  # derlemeyi yerelde aç
 
 ```
 src/
-  BaristaClicker.jsx     oyunun tamamı (durum, döngü, kayıt, arayüz)
+  BaristaClicker.jsx     oyunun tamamı (durum, döngü, kayıt, ses motoru, arayüz)
   barista-assets/        oyun görselleri (WebP)
+  barista-sounds/        oyun sesleri (MP3)
   main.jsx, index.css    giriş noktası ve Tailwind
 public/                  favicon ve uygulama ikonları
 docs/                    README ekran görüntüleri
 ```
 
-Bileşen başka bir React projesine de taşınabilir: `BaristaClicker.jsx` ile `barista-assets/` klasörünü aynı yere koyman yeterli. Tailwind CSS 3 ve `lucide-react` gerekir.
+Bileşen başka bir React projesine de taşınabilir: `BaristaClicker.jsx` ile `barista-assets/` ve `barista-sounds/` klasörlerini aynı yere koyman yeterli. Tailwind CSS 3 ve `lucide-react` gerekir.
 
-## Görseller
+## Görseller ve sesler
 
-Bütün görseller Google Gemini ile üretildi. Nesnelerin yeşil zeminleri temizlenip şeffaf yapıldı, dükkân sahneleri aynı ölçekte kırpıldı; böylece dükkân büyüdükçe sahne de büyüyor.
+Bütün görseller ve sesler Google Gemini ile üretildi. Nesnelerin yeşil zeminleri temizlenip şeffaf yapıldı, dükkân sahneleri aynı ölçekte kırpıldı; böylece dükkân büyüdükçe sahne de büyüyor. Ses efektleri Gemini'nin ürettiği parçaların tekil vuruşlarından kesildi, seviyeleri birbirine göre dengelendi. Tarayıcılar ilk etkileşimden önce ses çalmaya izin vermediği için sesler ilk tıklamayla başlar.
