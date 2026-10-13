@@ -72,6 +72,8 @@ export function loadSave(initialSave) {
     gold: Math.floor(num(save.gold)),
     streak: loadStreak(save.streak),
     offline: loadOffline(save.offline),
+    // Saat ileri alınıp geri getirilmişse telaş günlerce kilitli kalmasın: en fazla 1 gün sonrası
+    rushReadyAt: Math.min(num(save.rushReadyAt), Date.now() + 86_400_000),
   };
 }
 

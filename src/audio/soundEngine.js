@@ -209,10 +209,10 @@ export function createSoundEngine(files, musicTrack) {
     startMusic();
   };
 
-  // vary: çalma hızında ± rastgele sapma (aynı ses tekrar tekrar duyulunca kulak yorulmasın)
+  // vary: çalma hızında ± rastgele sapma (aynı ses tekrar tekrar duyulunca kulak yorulmasın) · rate: temel hız
   // minGap: aynı sesin iki çalışı arasındaki en kısa süre; maxVoices: aynı anda en fazla kaç kopya
   const play = (name, options = {}) => {
-    const { volume = 1, vary = 0, minGap = 0, maxVoices = 4, delay = 0 } = options;
+    const { volume = 1, vary = 0, minGap = 0, maxVoices = 4, delay = 0, rate = 1 } = options;
     if (!sfxOn || !ctx) return;
     const list = buffers[name];
     if (!list || ctx.state !== 'running') {
@@ -233,7 +233,8 @@ export function createSoundEngine(files, musicTrack) {
 
     const source = ctx.createBufferSource();
     source.buffer = list[index];
-    if (vary) source.playbackRate.value = 1 + (Math.random() * 2 - 1) * vary;
+    // rate: temel çalma hızı (Kahve Telaşı'nda kombo arttıkça ses incelir)
+    if (vary || rate !== 1) source.playbackRate.value = rate * (1 + (Math.random() * 2 - 1) * vary);
     const gain = ctx.createGain();
     gain.gain.value = volume;
     source.connect(gain);

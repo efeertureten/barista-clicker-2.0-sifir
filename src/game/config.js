@@ -2,7 +2,7 @@
 // uzaktan değiştirebilir (bkz. mergeConfig); bu yüzden içinde metin ya da görsel yok, yalnızca sayılar var.
 // Metinler ve görseller content.js'te, bu sayılarla birleştirilerek kullanılır.
 
-export const APP_VERSION = '2.7.0';
+export const APP_VERSION = '2.8.0';
 
 export const DEFAULT_CONFIG = {
   // Ölçümde hangi dengeyle oynandığını ayırt etmek için (oyuncu özelliği: economy_version)
@@ -80,6 +80,21 @@ export const DEFAULT_CONFIG = {
     freezesMax: 2,
     instantHours: 1,
     instantCost: 5,
+  },
+
+  // Kahve Telaşı: seconds saniyelik aktif mod. Her dokunuş = (tık gücü + saniyelik üretim × tapCpsSeconds) × kombo
+  // çarpanı; çarpan ardışık her dokunuşta comboStep artar, comboMax'ta durur, comboWindowMs boyunca dokunulmazsa
+  // sıfırlanır. Telaş bitince cooldownSeconds sonra yeniden hazır olur (oyun kapalıyken de süre işler).
+  // unlockLevel. dükkanda açılır (bir kez açıldıktan sonra yeni şubelerde de açık kalır).
+  // 30 sn'de ~180 dokunuşla iyi bir oyuncu yaklaşık 8–9 dakikalık üretim kazanır.
+  rush: {
+    unlockLevel: 2,
+    seconds: 30,
+    cooldownSeconds: 20 * 60,
+    tapCpsSeconds: 1,
+    comboStep: 0.04,
+    comboMax: 2.5,
+    comboWindowMs: 700,
   },
 
   // İlk deneyim rehberi. share: yeni oyuncuların rehberi gören payı (1 = herkes, 0.5 = A/B testi).
@@ -209,6 +224,24 @@ export function mergeConfig(base, override) {
     Object.entries(fields).forEach(([key, ok]) => {
       take(`orders.${key}`, o[key], ok, (v) => {
         config.orders[key] = v;
+      });
+    });
+  }
+
+  if (override.rush && typeof override.rush === 'object') {
+    const o = override.rush;
+    const fields = {
+      unlockLevel: (v) => isInt(v, 1, levels),
+      seconds: (v) => isNum(v, 5, 300),
+      cooldownSeconds: (v) => isNum(v, 0, 86_400),
+      tapCpsSeconds: (v) => isNum(v, 0, 60),
+      comboStep: (v) => isNum(v, 0, 1),
+      comboMax: (v) => isNum(v, 1, 20),
+      comboWindowMs: (v) => isNum(v, 100, 5_000),
+    };
+    Object.entries(fields).forEach(([key, ok]) => {
+      take(`rush.${key}`, o[key], ok, (v) => {
+        config.rush[key] = v;
       });
     });
   }

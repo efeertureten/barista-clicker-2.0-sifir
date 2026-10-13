@@ -20,7 +20,8 @@ Yeni oyuncuyu bir rehber karşılar ve ilk dakikada döngünün dört parçasın
 - Kahve İmparatorluğu'na ulaşınca **Yeni Şube** açabilirsin: başka bir semtte (Kadıköy, Balat, Beşiktaş…) seyyar tezgâhla yeniden başlarsın ama itibar kazanırsın. İtibar = küp kök(bu şubede demlenen fincan / 800 milyon); her puan üretimi ve tık gücünü %10 artırır. Kasa, fincanlar, yükseltmeler ve dükkân seviyesi sıfırlanır; itibar, toplam kazanç ve tık sayısı kalır. Şubeyi ne kadar geç açarsan o kadar çok itibar kazanırsın.
 - Her gün 3 **sipariş** gelir ("250 kez latteye dokun", "X fincan demle", "8 yükseltme al", "Hoş geldin kartından topla"); hedefler o anki gücüne göre ölçeklenir. Her teslim para ve 1 **Altın Çekirdek** verir, üçü birden +2 daha. Sipariş teslim ettiğin her gün **seriye** eklenir; kaçırdığın günü dondurma hakkı karşılar (2 hak, her 7 günde biri geri gelir), 3, 7, 14 ve 30. günlerde ek Altın Çekirdek var. Altın Çekirdeği **hızlı demlemeye** harcarsın: 5 Altın Çekirdeğe 1 saatlik üretim. Siparişler gece yarısı yenilenir; geri sayım yok.
 - Sen yokken de dükkân yarım hızla çalışır. Kazanç en çok 4 saat birikir; döndüğünde "Hoş geldin" kartından kasaya toplarsın. Bir dakikadan kısa ayrılıklar sayılmaz, üretim tam hızla devam eder.
-- İlerleme tarayıcıda otomatik kaydedilir.
+- Köşe Kafe'den itibaren fincanın altında **Kahve Telaşı** düğmesi çıkar: 30 saniye boyunca her dokunuş tık gücü + 1 saniyelik üretim kadar fincan verir. Art arda dokundukça kombo çarpanı büyür (her dokunuşta +0,04, en çok ×2,5); 0,7 saniye ara verirsen çarpan sıfırlanır. Telaş bitince 20 dakika sonra yeniden hazır olur (oyun kapalıyken de süre işler). Oyun arka plana geçerse telaş biter. İyi bir telaş yaklaşık 8–9 dakikalık üretim kazandırır; değerler `config.rush`'ta ve Remote Config'ten değiştirilebilir.
+- İlerleme cihazda otomatik kaydedilir; istersen bulutta da yedeklenir (aşağıda).
 
 ## Dükkân seviyeleri
 
@@ -242,6 +243,8 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `milestone_reached` | bir üretici kilometre taşına ulaştığında | üretici, adet, yeni çarpan, dükkân seviyesi |
 | `config_rejected` | Remote Config'teki bazı alanlar geçersiz olduğu için atlandığında | atlanan alanlar |
 | `offline_collect` | "Hoş geldin" kartında kazanç toplandığında | uzakta kalınan dakika, depoya sayılan dakika, depo doldu mu, fincan, tutar, depo sınırı (saat) |
+| `rush_start` | Kahve Telaşı başladığında | dükkân seviyesi, şube |
+| `rush_end` | telaş bittiğinde | neden (`time` / `hidden`), dokunuş, en yüksek kombo ve çarpan, kazanılan fincan, dükkân seviyesi |
 | `cloud_save` | bulut kaydı açıldığında, kapatıldığında, kodla yüklendiğinde ya da çakışmada | eylem (`enable`, `disable`, `restore`, `conflict`, `keep_local`, `load_remote`), dükkân seviyesi |
 | `feedback_sent` | geri bildirim gönderildiğinde | tür, uzunluk, dükkân seviyesi |
 | `notification_permission` | bildirim izni sorulduğunda (Android) | sonuç (`granted`, `denied`, `declined`), nereden (`prompt`, `settings`) |

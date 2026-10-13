@@ -112,8 +112,16 @@ ${FONTS}
 .bc-guide-card { box-shadow: 0 0 0 2px var(--crema), 0 0 0 6px rgba(208, 146, 74, 0.18); animation: bc-guide-glow 1.6s ease-in-out infinite; }
 @keyframes bc-guide-glow { 50% { box-shadow: 0 0 0 2px var(--crema), 0 0 0 10px rgba(208, 146, 74, 0.06); } }
 @keyframes bc-rise { from { opacity: 0; transform: translateY(24px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+/* Kahve Telaşı: hazır düğmesi hafifçe parlar, telaşta fincanın çevresinde nabız atan bir hare; süre çubuğu */
+.bc-rush-ready { animation: bc-guide-glow 1.6s ease-in-out infinite; box-shadow: 0 0 0 2px var(--crema), 0 0 0 6px rgba(208, 146, 74, 0.18); }
+.bc-rush-halo { animation: bc-rush-halo 0.8s ease-in-out infinite; }
+@keyframes bc-rush-halo { 0%, 100% { box-shadow: 0 0 0 0 rgba(208, 146, 74, 0.55), 0 0 40px 6px rgba(208, 146, 74, 0.35); } 50% { box-shadow: 0 0 0 16px rgba(208, 146, 74, 0), 0 0 60px 14px rgba(208, 146, 74, 0.5); } }
+.bc-rush-bar { animation: bc-rush-bar linear forwards; transform-origin: left; }
+@keyframes bc-rush-bar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.bc-combo { animation: bc-pop 0.18s ease-out; }
 @media (prefers-reduced-motion: reduce) {
-  .bc-bob, .bc-ring, .bc-toast, .bc-scene-in, .bc-pop, .bc-rise, .bc-guide-card { animation: none; }
+  .bc-bob, .bc-ring, .bc-toast, .bc-scene-in, .bc-pop, .bc-rise, .bc-guide-card, .bc-rush-ready, .bc-combo { animation: none; }
+  .bc-rush-halo { animation: none; box-shadow: 0 0 0 6px rgba(208, 146, 74, 0.45); }
   .bc-hint { animation: none; opacity: 0.7; transform: scale(1.06); }
   .bc-bean { display: none; }
   .bc-float { animation: bc-fade 0.9s ease-out forwards; }

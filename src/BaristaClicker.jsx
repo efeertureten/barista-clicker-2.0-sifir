@@ -56,6 +56,7 @@ import { sendFeedback } from './cloud/feedback.js';
 import CloudPanel from './ui/CloudPanel.jsx';
 import FeedbackModal from './ui/FeedbackModal.jsx';
 import NotifyPrompt from './ui/NotifyPrompt.jsx';
+import RushPanel from './ui/RushPanel.jsx';
 import { planReminders } from './game/reminders.js';
 import {
   cancelReminders,
@@ -124,6 +125,10 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
   // Bildirimler (yalnızca Android): tercih ve ilk toplamadan sonra çıkan soru
   const [notifyPref, setNotifyPrefState] = useState(() => readText(NOTIFY_PREF_KEY));
   const [notifyPromptOpen, setNotifyPromptOpen] = useState(false);
+  // Kahve Telaşı: süren telaşın sayaçları ref'te (her dokunuşta değişir); rushActive çizimi tetikler
+  const rushRef = useRef(null);
+  const [rushActive, setRushActive] = useState(false);
+  const [, setRushTick] = useState(0);
 
   const stateRef = useRef(state);
   // Buluttan kayıt yüklenirken otomatik kayıt durur (sayfa yeniden yüklenmeden eski durum üstüne yazılmasın)
@@ -394,11 +399,30 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
 
   const handleBrew = (event) => {
     unlockAudio();
-    dispatch({ type: 'click' });
+    let amount = perClick;
+    const run = rushRef.current;
+    const now = Date.now();
+    if (run && now < run.endsAt) {
+      // Kahve Telaşı: art arda dokundukça çarpan büyür, ara verince sıfırlanır
+      run.combo = now - run.lastTapAt <= config.rush.comboWindowMs ? run.combo + 1 : 1;
+      run.lastTapAt = now;
+      run.mult = economy.rushMultiplierOf(run.combo - 1);
+      amount = economy.rushTapBaseOf(state) * run.mult;
+      run.taps += 1;
+      run.coffees += amount;
+      run.maxCombo = Math.max(run.maxCombo, run.combo);
+      run.maxMult = Math.max(run.maxMult, run.mult);
+      dispatch({ type: 'rushTap', multiplier: run.mult });
+      // Kombo büyüdükçe ses biraz incelir (en çok %12)
+      sfx('pop', { vary: 0.01, minGap: 0.04, maxVoices: 3, rate: 1 + Math.min(0.12, (run.mult - 1) * 0.08) });
+      setRushTick((t) => t + 1);
+    } else {
+      dispatch({ type: 'click' });
+      // Ses 1 sn sürer: hızlı dokunuşta en eski kopya kısılır, her dokunuş baloncukla başlar.
+      // Ezgi olduğu için hız sapması küçük tutulur (±%1,5, çeyrek yarım sesten az).
+      sfx('pop', { vary: 0.015, minGap: 0.04, maxVoices: 3 });
+    }
     setBump((b) => b + 1);
-    // Ses 1 sn sürer: hızlı dokunuşta en eski kopya kısılır, her dokunuş baloncukla başlar.
-    // Ezgi olduğu için hız sapması küçük tutulur (±%1,5, çeyrek yarım sesten az).
-    sfx('pop', { vary: 0.015, minGap: 0.04, maxVoices: 3 });
     markFtue('first_brew', 1);
     // Veri izni ilk tıklamadan sonra sorulur: oyunun ilk izlenimi bir izin kutusu olmasın
     if (analytics.needsConsent()) setConsentOpen(true);
@@ -412,7 +436,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     const jitter = (Math.random() - 0.5) * 36;
     setFloaters((list) => [
       ...list.slice(-14),
-      { id, x, y, textX: x + jitter, amount: perClick, beans: makeBeanBurst() },
+      { id, x, y, textX: x + jitter, amount, beans: makeBeanBurst() },
     ]);
     const t = setTimeout(() => {
       setFloaters((list) => list.filter((f) => f.id !== id));
@@ -861,6 +885,83 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     analytics.track('feedback_sent', { kind, length: text.trim().length, shop_level: shopIndex + 1 });
   };
 
+  /* ---- Kahve Telaşı ---- */
+
+  const rushUnlocked = economy.rushUnlocked(state);
+  const rushReadyIn = Math.max(0, ((state.rushReadyAt ?? 0) - Date.now()) / 1000);
+  const rushStatus = rushActive ? 'active' : !rushUnlocked ? 'locked' : rushReadyIn > 0 ? 'cooldown' : 'ready';
+
+  const startRush = () => {
+    const now = Date.now();
+    if (rushRef.current || !rushUnlocked || now < (state.rushReadyAt ?? 0)) return;
+    unlockAudio();
+    dispatch({ type: 'rushStart', now });
+    rushRef.current = {
+      startedAt: now,
+      endsAt: now + config.rush.seconds * 1000,
+      taps: 0,
+      combo: 0,
+      mult: 1,
+      maxCombo: 0,
+      maxMult: 1,
+      coffees: 0,
+      lastTapAt: 0,
+      shopLevel: shopIndex + 1,
+    };
+    setRushActive(true);
+    sfx('ting', { maxVoices: 2 });
+    sfx('ting', { delay: 0.12, maxVoices: 2 });
+    analytics.track('rush_start', { shop_level: shopIndex + 1, branch: state.branches });
+  };
+
+  const endRush = (reason) => {
+    const run = rushRef.current;
+    if (!run) return;
+    rushRef.current = null;
+    setRushActive(false);
+    sfx('ting', { maxVoices: 2 });
+    if (run.taps > 0) {
+      showToast({
+        key: `rush-${run.startedAt}`,
+        title: `Telaş bitti: +${fmt(run.coffees)} fincan`,
+        subtitle: `${run.taps} dokunuş · en yüksek kombo ${run.maxCombo} (×${run.maxMult.toLocaleString('tr-TR', { maximumFractionDigits: 1 })})`,
+        icon: Flame,
+      });
+    }
+    analytics.track('rush_end', {
+      reason,
+      taps: run.taps,
+      max_combo: run.maxCombo,
+      max_multiplier: Math.round(run.maxMult * 100) / 100,
+      coffees: Math.round(run.coffees),
+      shop_level: run.shopLevel,
+    });
+  };
+  const endRushRef = useRef(endRush);
+  endRushRef.current = endRush;
+
+  // Beklerken arada bir yeniden çiz: "… sonra hazır" süresi ilerlesin, süre dolunca düğme gelsin
+  useEffect(() => {
+    if (rushStatus !== 'cooldown') return undefined;
+    const id = setInterval(() => setRushTick((t) => t + 1), 15_000);
+    return () => clearInterval(id);
+  }, [rushStatus]);
+
+  // Telaş sürerken: süre dolunca biter; oyun arka plana geçerse hemen biter (boşta telaş olmaz)
+  useEffect(() => {
+    if (!rushActive) return undefined;
+    const id = setInterval(() => {
+      const run = rushRef.current;
+      if (run && Date.now() >= run.endsAt) endRushRef.current('time');
+      else setRushTick((t) => t + 1);
+    }, 200);
+    const offVisibility = onVisibilityChange((hidden) => hidden && endRushRef.current('hidden'));
+    return () => {
+      clearInterval(id);
+      offVisibility();
+    };
+  }, [rushActive]);
+
   /* ---- Bildirimler (yalnızca Android) ---- */
 
   const setNotifyPref = (value) => {
@@ -1122,6 +1223,9 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                 className="bc-cup relative grid h-64 w-64 select-none place-items-center rounded-full transition-transform duration-100 ease-out hover:scale-[1.03] active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--crema)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--foam)] sm:h-72 sm:w-72 lg:[@media(max-height:820px)]:h-56 lg:[@media(max-height:820px)]:w-56"
               >
                 <span aria-hidden="true" className="bc-glow pointer-events-none absolute -inset-12 rounded-full" />
+                {rushActive && (
+                  <span aria-hidden="true" className="bc-rush-halo pointer-events-none absolute inset-2 rounded-full" />
+                )}
                 {tutorialStep === 'brew' && (
                   <span
                     aria-hidden="true"
@@ -1176,6 +1280,17 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                 </React.Fragment>
               ))}
             </div>
+
+            {!guide && rushStatus !== 'locked' && (
+              <RushPanel
+                status={rushStatus}
+                readyIn={rushReadyIn}
+                cfg={config.rush}
+                run={rushRef.current}
+                now={Date.now()}
+                onStart={startRush}
+              />
+            )}
 
             {/* Geniş ekranda rehber bu alanda durur; telefonda alta sabitlenir ve bu yazı yerinde kalır */}
             {guide && <TutorialGuide guide={guide} onSkip={skipTutorial} />}

@@ -29,10 +29,12 @@ export const INITIAL_STATE = {
   // Uzaktayken biriken, henüz toplanmamış üretim:
   // { coffees, seconds (depoya sayılan süre), away (gerçek uzak kalma süresi), capped (depo doldu mu) }
   offline: null,
+  // Kahve Telaşı bu andan (ms) itibaren yeniden başlatılabilir; 0 = hazır
+  rushReadyAt: 0,
 };
 
 export function createEconomy(config) {
-  const { shops, upgrades, costGrowth, offline, milestones, milestoneMultiplier, prestige, orders } = config;
+  const { shops, upgrades, costGrowth, offline, milestones, milestoneMultiplier, prestige, orders, rush } = config;
 
   // Yalnızca fincan sayısına göre seviye
   const levelFromCoffees = (coffees) => {
@@ -69,6 +71,13 @@ export function createEconomy(config) {
   const canOpenBranch = (state) => branchUnlocked(state) && reputationGainOf(state) >= 1;
   // Bir sonraki itibar puanı için bu şubede gereken toplam fincan
   const coffeesForGain = (gain) => gain ** 3 * prestige.divisor;
+
+  // Kahve Telaşı: bir kez açıldıktan sonra (yeni şubelerde de) açık kalır
+  const rushUnlocked = (state) => levelOf(state) + 1 >= rush.unlockLevel || (state.branches ?? 1) > 1;
+  const rushReadyAtOf = (state) => state.rushReadyAt ?? 0;
+  const rushMultiplierOf = (combo) => Math.min(rush.comboMax, 1 + rush.comboStep * Math.max(0, combo));
+  // Telaşta tek dokunuşun çarpansız değeri (fincan)
+  const rushTapBaseOf = (state) => perClickFor(state) + cpsFor(state) * rush.tapCpsSeconds;
 
   function produce(state, amount) {
     if (amount <= 0) return state;
@@ -175,6 +184,22 @@ export function createEconomy(config) {
       }
       // Yeni şube: itibar kazanılır; para, fincan, yükseltmeler ve dükkan seviyesi sıfırlanır.
       // Toplam kazanç ve tık sayısı oyuncunun ömür boyu istatistiği olarak kalır.
+      // Kahve Telaşı başladı: bekleme süresi şimdiden yazılır (yeniden yüklemek telaşı tazelemez)
+      case 'rushStart': {
+        if (!rushUnlocked(state) || action.now < rushReadyAtOf(state)) return state;
+        return { ...state, rushReadyAt: action.now + (rush.seconds + rush.cooldownSeconds) * 1000 };
+      }
+      // Telaşta bir dokunuş: action.multiplier kombo çarpanı (arayüz hesaplar, burada sınırlanır)
+      case 'rushTap': {
+        const multiplier = Math.min(rush.comboMax, Math.max(1, action.multiplier || 1));
+        const amount = rushTapBaseOf(state) * multiplier;
+        const next = produce(state, amount);
+        return {
+          ...next,
+          clicks: state.clicks + 1,
+          daily: bumpOrders(bumpOrders(state.daily, 'tap', 1), 'brew', amount),
+        };
+      }
       case 'newBranch': {
         if (!canOpenBranch(state) || state.offline) return state;
         return {
@@ -186,6 +211,7 @@ export function createEconomy(config) {
           daily: state.daily,
           gold: state.gold,
           streak: state.streak,
+          rushReadyAt: state.rushReadyAt ?? 0,
         };
       }
       case 'reset':
@@ -213,6 +239,9 @@ export function createEconomy(config) {
     branchUnlocked,
     canOpenBranch,
     coffeesForGain,
+    rushUnlocked,
+    rushMultiplierOf,
+    rushTapBaseOf,
     reducer,
   };
 }

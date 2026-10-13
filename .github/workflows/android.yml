@@ -102,8 +102,9 @@ jobs:
             SDK=$(grep -E '^(sdkVersion|targetSdkVersion)' badging.txt | tr '\n' ' ' || true)
             LABEL=$(grep -m1 "^application-label:" badging.txt || true)
             CERT=$(grep -m1 -E 'certificate DN|SHA-256 digest' signer.txt | tr '\n' ' ' || true)
+            PERMS=$(grep -oE "^uses-permission: name='[^']+'" badging.txt | sed "s/.*android.permission.//; s/'//g" | tr '\n' ' ' || true)
             SIZE=$(du -k "$f" | cut -f1)
-            echo "::notice title=$(basename "$f")::$PKG · $SDK · $LABEL · $SIZE KB · $CERT"
+            echo "::notice title=$(basename "$f")::$PKG · $SDK · $LABEL · $SIZE KB · $CERT · izinler: $PERMS"
           done
           jarsigner -verify "$AAB" > aab.txt 2>&1 || true
           if ! grep -q "jar verified" aab.txt; then
