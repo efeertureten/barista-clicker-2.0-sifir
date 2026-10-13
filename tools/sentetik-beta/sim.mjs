@@ -3,7 +3,7 @@
 // varsayımlardan. Aynı oyuncular (aynı tohum) farklı senaryolarda oynatılır: farklar yalnızca senaryodan kaynaklanır.
 //
 // Kullanım: node sim.mjs <senaryo> <oyuncu sayısı> <çıktı klasörü> [--calib t,g,b,ilk,alışkanlık] [--urge k] [--caploss v] [--tag ad]
-// Senaryo bayrakları "+" ile birleşir: base · prestige · guideAll · noGuide · cap4 · cap8 · grow200 · market
+// Senaryo bayrakları "+" ile birleşir: base · prestige · guideAll · noGuide · cap4 · cap8 · grow200 · market · orders · stars · rush
 //   örn. node sim.mjs prestige+cap4+market+guideAll 4000 runs
 
 import fs from 'node:fs';
@@ -71,6 +71,11 @@ const PRESTIGE = FLAGS.has('prestige'); // oyuncular Yeni Şube'yi kullanır (oy
 const MARKET_BUTTON = FLAGS.has('market');
 // orders: günlük siparişler (oyunun gerçek kodu): oyuncu tamamlananı teslim eder, Altın Çekirdeği hızlı demlemeye harcar
 const ORDERS = FLAGS.has('orders');
+// stars: seviye yıldızları (oyunun gerçek kodu); her yıldız bir ara ilerleme anı sayılır (--starw, varsayılan 0,5)
+const STARS = FLAGS.has('stars');
+// rush: Kahve Telaşı (oyunun gerçek kodu); hazırsa oyuncu tipine göre başlatır, telaşta daha hızlı dokunur (--rushw 0,5)
+const RUSH = FLAGS.has('rush');
+const RUSH_USE = { tourist: 0.5, casual: 0.7, engaged: 0.9 }; // hazır gördüğünde başlatma olasılığı
 
 /* ---------------- davranış varsayımları ---------------- */
 // Oyuncu tipleri: payı, tıklama hızı (tık/sn), oturumda tıklayarak geçen pay, günlük oturum, oturum süresi (dk, medyan),
@@ -111,6 +116,10 @@ const orderwArg = process.argv.indexOf('--orderw');
 const ORDER_W = orderwArg > 0 ? Number(process.argv[orderwArg + 1]) : 1;
 const capLossArg = process.argv.indexOf('--caploss');
 if (capLossArg > 0) W.cappedLoss = Number(process.argv[capLossArg + 1]);
+const starwArg = process.argv.indexOf('--starw');
+const STAR_W = starwArg > 0 ? Number(process.argv[starwArg + 1]) : 0.5;
+const rushwArg = process.argv.indexOf('--rushw');
+const RUSH_W = rushwArg > 0 ? Number(process.argv[rushwArg + 1]) : 0.5;
 const tagArg = process.argv.indexOf('--tag');
 const TAG = tagArg > 0 ? process.argv[tagArg + 1] : '';
 
@@ -184,6 +193,7 @@ function simulatePlayer(i) {
         : Infinity;
   const discoverLater = disc(); // sonraki oturumlarda fark etme
   const buyR = stream(i, 5);
+  const rushR = stream(i, 6);
 
   const config = BASE_CONFIG;
   const economy = createEconomy(config);
@@ -259,6 +269,7 @@ function simulatePlayer(i) {
     });
     if (state.offline) {
       const o = state.offline;
+      p.sawOffline = true;
       const value = o.coffees * config.shops[playerLevel()].price;
       const cpsNow = economy.cpsOf(state.owned);
       emit(p, s.start + 2, 'offline_collect', {
@@ -281,18 +292,50 @@ function simulatePlayer(i) {
     const stayForGuide = p.variant === 'guide' && sessionNo === 1 && U[0][2] < 0.5;
     let tapAcc = 0;
     let tutorialDoneNow = false;
+    let rushEnd = -1; // bu oturumda süren telaşın bitişi (oturum içi saniye)
+    let rushCombo = 0;
+    let rushTaps = 0;
     for (let t = 0; t < len; t += 1) {
       const now = s.start + t;
       const guiding = tutorial === 'active';
       const activeShare = guiding ? 0.9 : ARCH[arch].active;
-      tapAcc += p.tapRate * activeShare;
+      // ---- Kahve Telaşı: hazırsa ve oyuncu fark edip başlatırsa 30 sn hızlı dokunur ----
+      if (RUSH && !guiding && rushEnd < t && economy.rushUnlocked(state) && now * 1000 >= (state.rushReadyAt ?? 0)) {
+        if (rushR() < RUSH_USE[arch] / 10) {
+          dispatch({ type: 'rushStart', now: now * 1000 });
+          rushEnd = t + config.rush.seconds;
+          rushCombo = 0;
+          rushTaps = 0;
+          p.rushes = (p.rushes ?? 0) + 1;
+        }
+      }
+      const rushing = t < rushEnd;
+      // telaşta oyuncu bütün dikkatini verir ve biraz daha hızlı dokunur (en çok 7/sn); 0,7 sn'den kısa aralık kombo sürer
+      tapAcc += rushing ? Math.min(7, p.tapRate * 1.4) : p.tapRate * activeShare;
       while (tapAcc >= 1) {
         tapAcc -= 1;
         const firstClick = state.clicks === 0;
-        dispatch({ type: 'click' });
+        if (rushing) {
+          dispatch({ type: 'rushTap', multiplier: economy.rushMultiplierOf(rushCombo) });
+          rushCombo += 1;
+          rushTaps += 1;
+        } else dispatch({ type: 'click' });
         if (firstClick) markFtue(now, 'first_brew', 1);
       }
+      if (rushing && t === rushEnd - 1) {
+        moments += RUSH_W;
+        boredomActive = 0;
+        emit(p, now, 'rush_end', { taps: rushTaps, max_combo: rushCombo });
+      }
       dispatch({ type: 'tick', dt: 1 });
+      // ---- seviye yıldızları ----
+      if (STARS && economy.starsReachedOf(state.coffees) > (state.stars ?? 0)) {
+        const before = state.stars ?? 0;
+        dispatch({ type: 'claimStars' });
+        moments += STAR_W * (state.stars - before);
+        boredomActive = 0;
+        p.starsTotal = (p.starsTotal ?? 0) + (state.stars - before);
+      }
       boredomActive += 1;
 
       if (!discovered && sessionNo === 1 && t >= discoverAt) discovered = true;
@@ -365,6 +408,9 @@ function simulatePlayer(i) {
         for (let l = levelBefore + 1; l <= level; l += 1) {
           emit(p, now, 'level_up', { level: l + 1, session_number: sessionNo });
           moments += 1;
+          // ilk şubede bu seviyeye ilk ulaşılan gün (ilerleme hızı ölçümü)
+          p.reach = p.reach ?? {};
+          if (prestiges === 0 && p.reach[l + 1] === undefined) p.reach[l + 1] = day;
         }
         if (levelBefore === 0) markFtue(now, 'first_level_up', 4);
         levelBefore = level;
@@ -487,6 +533,12 @@ function simulatePlayer(i) {
     max_level: playerLevel() + 1,
     prestiges,
     orders_done: p.ordersDone ?? 0,
+    rushes: p.rushes ?? 0,
+    reach_l3: p.reach?.[3] ?? null,
+    reach_l4: p.reach?.[4] ?? null,
+    reach_l5: p.reach?.[5] ?? null,
+    reach_l6: p.reach?.[6] ?? null,
+    stars: p.starsTotal ?? 0,
     instant_brews: p.instant ?? 0,
     gold: state.gold ?? 0,
     streak: state.streak?.count ?? 0,

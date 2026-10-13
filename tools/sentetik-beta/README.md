@@ -16,6 +16,8 @@ Senaryo bayrakları: `prestige` (oyuncular Yeni Şube'yi oyunun gerçek koduyla 
 
 `orders`: günlük siparişler (oyunun gerçek kodu); oyuncu tamamlananı teslim eder, bonusu alır, Altın Çekirdeği hızlı demlemeye harcar. `--orderw <0..1>` teslimin ilerleme anı olarak ağırlığı (1 = seviye atlama kadar), `--streakw <logit>` serinin kendisinin oyuncuyu geri çağırma etkisi (gün başına, en çok 7 gün; varsayılan 0). `--set yol=değer,…` denge değerlerini Remote Config'teki gibi değiştirir, örn. `--set orders.tapTarget=300,orders.rewardSeconds=300`.
 
+`stars`: seviye yıldızları (oyunun gerçek kodu); her yıldız bir ara ilerleme anı sayılır (`--starw`, varsayılan 0,5). `rush`: Kahve Telaşı; hazır olduğunda oyuncu tipine göre (turist %50, gündelik %70, bağlı %90 olasılıkla, saniye başına onda biri) başlatır, telaşta 1,4 kat hızlı dokunur (en çok 7/sn) ve kombo sürer (`--rushw`, varsayılan 0,5). Oyuncu çıktısında `rushes`, `stars` ve ilk şubede Sv.3–6'ya ulaşılan gün (`reach_l3`…`reach_l6`) var.
+
 Duyarlılık: `--urge 2` (kısa deponun oyuncuyu geri çağırma etkisini 2 katına çıkarır), `--caploss 0` (dolu depoda hissedilen kaybı kapatır), `--tag ad` (çıktı dosya adına ek).
 
 ## Davranış modeli
