@@ -1,8 +1,5 @@
 // Oyunun ses dosyaları. Her ses adı için bir ya da birkaç varyasyon; çalarken aralarından rastgele biri seçilir.
-import tap1 from '../barista-sounds/tap-1.mp3';
-import tap2 from '../barista-sounds/tap-2.mp3';
-import tap3 from '../barista-sounds/tap-3.mp3';
-import tap4 from '../barista-sounds/tap-4.mp3';
+import popSfx from '../barista-sounds/pop.mp3';
 import drip1 from '../barista-sounds/drip-1.mp3';
 import drip2 from '../barista-sounds/drip-2.mp3';
 import drip3 from '../barista-sounds/drip-3.mp3';
@@ -18,8 +15,8 @@ import ting2 from '../barista-sounds/ting-2.mp3';
 import musicLoop from '../barista-sounds/music-loop.mp3';
 
 export const SOUNDS = {
-  tap: [tap1, tap2, tap3, tap4], // fincana kaşık: her tıklama
-  drip: [drip1, drip2, drip3, drip4], // kahve damlası: her tıklama, kaşığın üstünde
+  pop: [popSfx], // fincana dokunma: baloncuk patlaması ve marimba (kaynak dosyanın ilk saniyesi)
+  drip: [drip1, drip2, drip3, drip4], // kahve damlası: çevrimdışı toplama ve sipariş teslimi
   buyBeans: [buyBeansSfx],
   buyMachine: [buyMachineSfx],
   buyBarista: [buyBaristaSfx],

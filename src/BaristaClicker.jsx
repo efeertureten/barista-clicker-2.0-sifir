@@ -341,8 +341,9 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     unlockAudio();
     dispatch({ type: 'click' });
     setBump((b) => b + 1);
-    sfx('tap', { vary: 0.05, minGap: 0.03, maxVoices: 6 });
-    sfx('drip', { vary: 0.08, minGap: 0.06, maxVoices: 3 });
+    // Ses 1 sn sürer: hızlı dokunuşta en eski kopya kısılır, her dokunuş baloncukla başlar.
+    // Ezgi olduğu için hız sapması küçük tutulur (±%1,5, çeyrek yarım sesten az).
+    sfx('pop', { vary: 0.015, minGap: 0.04, maxVoices: 3 });
     markFtue('first_brew', 1);
     // Veri izni ilk tıklamadan sonra sorulur: oyunun ilk izlenimi bir izin kutusu olmasın
     if (analytics.needsConsent()) setConsentOpen(true);

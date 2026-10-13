@@ -62,7 +62,7 @@ Bu denge, günde 4 kısa oturum oynayan bir oyuncu için simülasyonla ayarland�
 - "Dükkân büyüdü" bildiriminde yeni dükkânın küçük resmi var.
 - Alınamayan yükseltmeler gri görünüyor, alınabilir hale gelince zıplıyor.
 - Arka planda kahve çizimli bir doku var; geniş ekranda kart ile fincan yan yana diziliyor.
-- Sesler: her tıklamada kahve damlası ve altında yumuşak bir kaşık sesi, her yükseltmenin kendi satın alma sesi, dükkân büyüyünce kapı zili ve kutlama melodisi, son seviyede fanfar, bir yükseltme alınabilir hale gelince ince belli bardak "ting"i.
+- Sesler: fincana her dokunuşta baloncuk patlaması ve kısa bir marimba ezgisi, her yükseltmenin kendi satın alma sesi, dükkân büyüyünce kapı zili ve kutlama melodisi, son seviyede fanfar, bir yükseltme alınabilir hale gelince ince belli bardak "ting"i.
 - Arka plan müziği: ilk açılışta girişiyle başlar, sonra kesintisiz döngüye girer; dükkân büyürken kutlama duyulsun diye kısılır, sekme arka plandayken durur.
 - Alttaki **Ses** ve **Müzik** düğmeleriyle ikisi ayrı ayrı kapatılabiliyor, tercih hatırlanıyor.
 - Hareket azaltma (`prefers-reduced-motion`) açıkken animasyonlar kapanıyor.
@@ -217,4 +217,4 @@ Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `platform
 
 ## Görseller ve sesler
 
-Bütün görseller ve sesler Google Gemini ile üretildi. Nesnelerin yeşil zeminleri temizlenip şeffaf yapıldı, dükkân sahneleri aynı ölçekte kırpıldı; böylece dükkân büyüdükçe sahne de büyüyor. Ses efektleri Gemini'nin ürettiği parçaların tekil vuruşlarından kesildi, seviyeleri birbirine göre dengelendi. Müzik döngüsü, parçanın kendini tekrar eden iki bölümü arasından kuruldu ve dikiş noktası yumuşak geçişle birleştirildi; döngü noktaları `src/audio/sounds.js` içindeki `MUSIC_TRACK` sabitinde. Tarayıcılar ilk etkileşimden önce ses çalmaya izin vermediği için sesler ilk tıklamayla başlar; müzik dosyası da sayfa açılışını yavaşlatmasın diye ancak o zaman indirilir.
+Bütün görseller ve sesler Google Gemini ile üretildi. Nesnelerin yeşil zeminleri temizlenip şeffaf yapıldı, dükkân sahneleri aynı ölçekte kırpıldı; böylece dükkân büyüdükçe sahne de büyüyor. Ses efektleri Gemini'nin ürettiği parçaların tekil vuruşlarından kesildi, seviyeleri birbirine göre dengelendi. Fincana dokunma sesi (`pop.mp3`) ayrı bir dosyanın ("Satisfying Bubble Pop / Bright Marimba Ding") ilk saniyesinden kesildi: baştaki sessizlik atıldı, sonuna 60 ms sönme eklendi, tek kanala indirildi ve seviyesi eski tıklama sesine göre ayarlandı. Müzik döngüsü, parçanın kendini tekrar eden iki bölümü arasından kuruldu ve dikiş noktası yumuşak geçişle birleştirildi; döngü noktaları `src/audio/sounds.js` içindeki `MUSIC_TRACK` sabitinde. Tarayıcılar ilk etkileşimden önce ses çalmaya izin vermediği için sesler ilk tıklamayla başlar; müzik dosyası da sayfa açılışını yavaşlatmasın diye ancak o zaman indirilir.
