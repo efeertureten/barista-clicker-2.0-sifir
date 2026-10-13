@@ -13,6 +13,10 @@
       "insetsHandling": "native",
       "initialViewportFitValueHint": "cover",
       "style": "LIGHT"
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_cup",
+      "iconColor": "#9C5F1E"
     }
   }
 }

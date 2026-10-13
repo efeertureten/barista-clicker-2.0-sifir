@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
+  Bell,
+  BellOff,
   Flame,
   MousePointerClick,
   Music,
@@ -16,7 +18,7 @@ import {
 import cupImg from './barista-assets/cup.webp';
 import beanImg from './barista-assets/bean.webp';
 import { src } from './lib/asset.js';
-import { readPref, writePref } from './lib/storage.js';
+import { readPref, readText, writePref, writeText } from './lib/storage.js';
 import { APP_VERSION } from './game/config.js';
 import { loadActiveConfig } from './game/activeConfig.js';
 import { buildShops, buildUpgrades, districtOf } from './game/content.js';
@@ -53,6 +55,19 @@ import {
 import { sendFeedback } from './cloud/feedback.js';
 import CloudPanel from './ui/CloudPanel.jsx';
 import FeedbackModal from './ui/FeedbackModal.jsx';
+import NotifyPrompt from './ui/NotifyPrompt.jsx';
+import { planReminders } from './game/reminders.js';
+import {
+  cancelReminders,
+  notificationsSupported,
+  onReminderOpen,
+  preloadNotifications,
+  requestNotificationPermission,
+  scheduleReminders,
+} from './platform/notifications.js';
+
+// Bildirim tercihi: 'on' | 'off' | yok (henüz sorulmadı)
+const NOTIFY_PREF_KEY = 'barista-clicker-notify-v1';
 
 // Bulut kaydı açıksa ilerleme bu aralıkla (değiştiyse) ve oyun arka plana geçince yedeklenir
 const CLOUD_SYNC_MS = 3 * 60 * 1000;
@@ -106,6 +121,9 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
   const [cloud, setCloud] = useState(() => cloudState());
   const [cloudPanel, setCloudPanel] = useState(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // Bildirimler (yalnızca Android): tercih ve ilk toplamadan sonra çıkan soru
+  const [notifyPref, setNotifyPrefState] = useState(() => readText(NOTIFY_PREF_KEY));
+  const [notifyPromptOpen, setNotifyPromptOpen] = useState(false);
 
   const stateRef = useRef(state);
   // Buluttan kayıt yüklenirken otomatik kayıt durur (sayfa yeniden yüklenmeden eski durum üstüne yazılmasın)
@@ -183,6 +201,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       sound: readPref(SOUND_PREF_KEY) ? 'on' : 'off',
       music: readPref(MUSIC_PREF_KEY) ? 'on' : 'off',
       cloud_save: cloudState() ? 'on' : 'off',
+      ...(notificationsSupported() ? { notifications: readText(NOTIFY_PREF_KEY) || 'unset' } : {}),
     });
 
     // Oyun görünürken her 15 saniyede aktif süreyi biriktir; geri dönüşte 30 dakikayı aşan ara yeni oturumdur
@@ -364,6 +383,14 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     const pending = timers.current;
     return () => pending.forEach(clearTimeout);
   }, []);
+  // Bileşenle birlikte temizlenen gecikmeli iş
+  const later = (fn, ms) => {
+    const t = setTimeout(() => {
+      timers.current.delete(t);
+      fn();
+    }, ms);
+    timers.current.add(t);
+  };
 
   const handleBrew = (event) => {
     unlockAudio();
@@ -470,6 +497,8 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       cap_hours: config.offline.capSeconds / 3600,
       shop_level: shopIndex + 1,
     });
+    // Çevrimdışı birikimi ilk kez topladı: depo dolunca haber verelim mi?
+    if (notificationsSupported() && notifyPref === null) later(() => setNotifyPromptOpen(true), 700);
   };
 
   /* ---------------- İlk deneyim rehberi ---------------- */
@@ -832,9 +861,93 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     analytics.track('feedback_sent', { kind, length: text.trim().length, shop_level: shopIndex + 1 });
   };
 
+  /* ---- Bildirimler (yalnızca Android) ---- */
+
+  const setNotifyPref = (value) => {
+    writeText(NOTIFY_PREF_KEY, value);
+    setNotifyPrefState(value);
+    analytics.setUserProperties({ notifications: value });
+  };
+  // Sistemden izin ister; verilmezse oyuncuya nereden açacağını söyler
+  const enableNotifications = async (source) => {
+    let granted = false;
+    try {
+      granted = await requestNotificationPermission();
+    } catch {
+      granted = false;
+    }
+    setNotifyPref(granted ? 'on' : 'off');
+    analytics.track('notification_permission', { result: granted ? 'granted' : 'denied', source });
+    if (!granted) {
+      showToast({
+        key: `notify-${Date.now()}`,
+        title: 'Bildirim izni kapalı',
+        subtitle: 'Telefonun ayarlarından Barista Clicker için açabilirsin.',
+        icon: BellOff,
+      });
+    }
+    return granted;
+  };
+  const acceptNotifyPrompt = async () => {
+    setNotifyPromptOpen(false);
+    if (await enableNotifications('prompt')) {
+      showToast({ key: `notify-${Date.now()}`, title: 'Tamam, haber vereceğiz', subtitle: 'Depo dolunca ve siparişler gelince.', icon: Bell });
+    }
+  };
+  const declineNotifyPrompt = () => {
+    setNotifyPromptOpen(false);
+    setNotifyPref('off');
+    analytics.track('notification_permission', { result: 'declined', source: 'prompt' });
+  };
+  const toggleNotifications = async () => {
+    if (notifyPref === 'on') {
+      setNotifyPref('off');
+      cancelReminders().catch(() => {});
+      analytics.track('settings_change', { setting: 'notifications', value: 'off' });
+      return;
+    }
+    if (await enableNotifications('settings')) analytics.track('settings_change', { setting: 'notifications', value: 'on' });
+  };
+
+  // Açıkken: oyun arka plana geçince hatırlatmaları kur, oyuncu dönünce iptal et
+  const notifyOn = notifyPref === 'on' && notificationsSupported();
+  useEffect(() => {
+    if (!notifyOn) return undefined;
+    preloadNotifications();
+    cancelReminders().catch(() => {}); // oyuncu şu an burada
+    const plan = () => {
+      const s = stateRef.current;
+      const today = dayKeyOf();
+      return planReminders({
+        now: Date.now(),
+        cps: economy.cpsFor(s),
+        price: SHOPS[economy.levelOf(s)].price,
+        offline: config.offline,
+        daily: s.daily,
+        streak: streakAlive(s.streak, today) ? s.streak.count : 0,
+        fmtMoney,
+      });
+    };
+    const offVisibility = onVisibilityChange((hidden) => {
+      if (hidden) scheduleReminders(plan()).catch(() => {});
+      else cancelReminders().catch(() => {});
+    });
+    const offOpen = onReminderOpen((kind) => analytics.track('notification_open', { kind }));
+    return () => {
+      offVisibility();
+      offOpen();
+    };
+    // economy, SHOPS ve config oturum boyunca değişmez
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifyOn]);
+
   // Android geri tuşu: önce açık pencereyi kapatır; kapatacak bir şey yoksa uygulama arka plana alınır
   const backRef = useRef(() => false);
   backRef.current = () => {
+    if (notifyPromptOpen) {
+      setNotifyPromptOpen(false);
+      return true;
+    }
     if (feedbackOpen) {
       setFeedbackOpen(false);
       return true;
@@ -1118,6 +1231,18 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
             ) : (
               ' · İlerlemen bu cihazda otomatik kaydedilir.'
             )}
+            {notificationsSupported() && (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  onClick={toggleNotifications}
+                  className="underline decoration-[var(--line)] underline-offset-2 hover:text-[var(--roast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)]"
+                >
+                  Bildirimler: {notifyPref === 'on' ? 'açık' : 'kapalı'}
+                </button>
+              </>
+            )}
             {analytics.isConfigured() && (
               <>
                 {' · '}
@@ -1317,6 +1442,14 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
         />
       )}
       {feedbackOpen && <FeedbackModal onSend={submitFeedback} onClose={() => setFeedbackOpen(false)} />}
+      {notifyPromptOpen && !state.offline && (
+        <NotifyPrompt
+          capHours={Math.round(config.offline.capSeconds / 3600)}
+          onAccept={acceptNotifyPrompt}
+          onDecline={declineNotifyPrompt}
+          onClose={() => setNotifyPromptOpen(false)}
+        />
+      )}
 
       {/* ---------------- Veri izni ---------------- */}
       {consentOpen && analytics.isConfigured() && (

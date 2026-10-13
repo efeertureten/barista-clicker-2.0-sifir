@@ -90,6 +90,12 @@ Oyun aynı kodla [Capacitor](https://capacitorjs.com) üzerinden Android uygulam
 - Ekran dikey. Çentik ve hareket çubuğu için boşluklar `env(safe-area-inset-*)` ile verilir; sistem çubukları saydam, simgeleri koyu.
 - Kayıt telefonda saklanır; tarayıcıdaki ilerleme uygulamaya geçmez. Android'in otomatik yedeklemesi açık.
 - Ölçümde `platform` oyuncu özelliği `android` olur (tarayıcıda `web`).
+- **Bildirimler:** Oyuncu çevrimdışı birikimi ilk kez topladığında bir kez sorulur: "Depo dolunca haber verelim mi?". Kabul ederse sistemden izin istenir. Ayar satırındaki "Bildirimler" bağlantısıyla sonradan açılıp kapatılabilir.
+  - **Ne zaman kurulur:** Uygulama arka plana her geçişte en fazla üç yerel bildirim kurulur, oyuncu dönünce hepsi iptal edilir. Bildirimler şunlar: depo dolduğunda; bugünkü siparişler bitmediyse 19:00'da, bittiyse ertesi sabah 10:00'da; üç gün gelmezse akşam bir kez.
+  - **Sessiz saatler:** 22:00–09:00 arasına düşen bildirim sabaha kayar.
+  - **Kod:** Plan saf bir fonksiyon (`src/game/reminders.js`); kurma `src/platform/notifications.js`.
+  - **Kesin alarm yok:** Kesin alarm istenmez (`SCHEDULE_EXACT_ALARM` izni manifestten çıkarıldı). Bildirim birkaç dakika gecikebilir ama oyuncudan ayrıca izin istenmez.
+  - **Tarayıcıda deneme:** `?debug=1&fakeNotify=1` sahte bir bildirim katmanı kullanır; kurulan bildirimler `window.__bcNotifications`'ta görünür.
 
 **Derleme.** `main`'e her push'ta GitHub Actions paketi derler ve çalıştırmanın "Artifacts" bölümüne koyar. Sürüm `package.json`'dan gelir (`2.5.0` → versionCode `20500`). `src/game/config.js` içindeki `APP_VERSION` ile aynı olmalı, değilse derleme durur. Play her yüklemede daha büyük bir versionCode istediği için her mağaza sürümünde sürüm numarası artırılır.
 
@@ -122,6 +128,7 @@ src/
     meta.js              kurulum tarihi, oturum sayısı, oyun süresi, ilk deneyim adımları, rehber grubu
     tutorial.js          rehberin adımları (oyun durumundan türetilir) ve A/B grubu ataması
     orders.js            günlük siparişler, seri ve dondurma hakları
+    reminders.js         Android bildirimlerinin planı: ne zaman, hangi metinle (sessiz saatler dahil)
     format.js            sayı ve para biçimleri
   audio/
     soundEngine.js       Web Audio ses motoru (efekt ve müzik kanalları, müzik kısma)
@@ -132,6 +139,7 @@ src/
     firebaseConfig.js    Firebase yapılandırması (boşken hiçbir yere veri gitmez)
   platform/
     native.js            tarayıcı mı Android mi; görünürlük (ön plan / arka plan) ve geri tuşu
+    notifications.js     yerel bildirimler: izin, kurma, iptal (yalnızca Android)
   cloud/
     firebaseRest.js      anonim giriş ve Firestore belgeleri (REST, SDK'sız)
     cloudSave.js         bulut kaydı: kayıt kodu, yedekleme, geri yükleme, çakışma
@@ -236,10 +244,12 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `offline_collect` | "Hoş geldin" kartında kazanç toplandığında | uzakta kalınan dakika, depoya sayılan dakika, depo doldu mu, fincan, tutar, depo sınırı (saat) |
 | `cloud_save` | bulut kaydı açıldığında, kapatıldığında, kodla yüklendiğinde ya da çakışmada | eylem (`enable`, `disable`, `restore`, `conflict`, `keep_local`, `load_remote`), dükkân seviyesi |
 | `feedback_sent` | geri bildirim gönderildiğinde | tür, uzunluk, dükkân seviyesi |
+| `notification_permission` | bildirim izni sorulduğunda (Android) | sonuç (`granted`, `denied`, `declined`), nereden (`prompt`, `settings`) |
+| `notification_open` | oyun bir bildirime dokunularak açıldığında | bildirim türü (`storage`, `orders_left`, `orders_new`, `comeback`) |
 | `game_reset` | oyun sıfırlandığında | sıfırlamadan önceki seviye, fincan ve tık sayısı |
 | `app_error` | yakalanmamış bir hata olduğunda | hata türü ve kısa mesajı |
 
-Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `platform` (`web` / `android`), `economy_version` (oyuncunun hangi dengeyle oynadığı), `tutorial_variant` (`guide` rehberli, `control` rehbersiz, `none` rehberden önce başlamış), `max_shop_level`, `branches`, `reputation`, `sound`, `music`, `cloud_save` (`on` / `off`). Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
+Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `platform` (`web` / `android`), `economy_version` (oyuncunun hangi dengeyle oynadığı), `tutorial_variant` (`guide` rehberli, `control` rehbersiz, `none` rehberden önce başlamış), `max_shop_level`, `branches`, `reputation`, `sound`, `music`, `cloud_save` (`on` / `off`), `notifications` (Android: `on` / `off` / `unset`). Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
 
 ## Görseller ve sesler
 
