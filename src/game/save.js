@@ -74,6 +74,8 @@ export function loadSave(initialSave) {
     offline: loadOffline(save.offline),
     // Saat ileri alınıp geri getirilmişse telaş günlerce kilitli kalmasın: en fazla 1 gün sonrası
     rushReadyAt: Math.min(num(save.rushReadyAt), Date.now() + 86_400_000),
+    // Yıldızlar 2.9'da geldi: alanı olmayan eski kayıt null (oyun açılınca ödülsüz eşitlenir)
+    stars: Number.isInteger(save.stars) && save.stars >= 0 ? save.stars : null,
   };
 }
 

@@ -17,6 +17,7 @@ Yeni oyuncuyu bir rehber karşılar ve ilk dakikada döngünün dört parçasın
 - Marketten yükseltme al: tık başına daha çok kahve ya da sen tıklamazken çalışan otomatik üretim.
 - Toplam demlenen fincan sayısı arttıkça dükkânın büyür, büyüdükçe fincan başına satış fiyatı da artar ve markette yeni bir üretici açılır.
 - Bir üreticiden 25, 50, 100, 150, 200 ve 300 adete ulaştığında o üreticinin üretimi her seferinde 2 katına çıkar.
+- İki dükkân arasında iki **yıldız** (ara hedef) var: 100 ve 200, 1.000 ve 3.500, 39.000 ve 120.000, 1,3 Mn ve 4,5 Mn, 280 Mn ve 5,3 Mr fincan. Her yıldız 1 Altın Çekirdek ve 2 dakikalık kazanç verir. Eşikler fincan sayısında logaritmik aralıklı, üretim katlanarak büyüdüğü için zamanda eşite yakın düşer. Bu yüzden ilerleme çubuğu yıldızlarda üç bölüme ayrılır ve her bölüm kendi aralığında dolar. Yeni şubede yıldızlar yeniden kazanılır; değerler `config.stars`'ta.
 - Kahve İmparatorluğu'na ulaşınca **Yeni Şube** açabilirsin: başka bir semtte (Kadıköy, Balat, Beşiktaş…) seyyar tezgâhla yeniden başlarsın ama itibar kazanırsın. İtibar = küp kök(bu şubede demlenen fincan / 800 milyon); her puan üretimi ve tık gücünü %10 artırır. Kasa, fincanlar, yükseltmeler ve dükkân seviyesi sıfırlanır; itibar, toplam kazanç ve tık sayısı kalır. Şubeyi ne kadar geç açarsan o kadar çok itibar kazanırsın.
 - Her gün 3 **sipariş** gelir ("250 kez latteye dokun", "X fincan demle", "8 yükseltme al", "Hoş geldin kartından topla"); hedefler o anki gücüne göre ölçeklenir. Her teslim para ve 1 **Altın Çekirdek** verir, üçü birden +2 daha. Sipariş teslim ettiğin her gün **seriye** eklenir; kaçırdığın günü dondurma hakkı karşılar (2 hak, her 7 günde biri geri gelir), 3, 7, 14 ve 30. günlerde ek Altın Çekirdek var. Altın Çekirdeği **hızlı demlemeye** harcarsın: 5 Altın Çekirdeğe 1 saatlik üretim. Siparişler gece yarısı yenilenir; geri sayım yok.
 - Sen yokken de dükkân yarım hızla çalışır. Kazanç en çok 4 saat birikir; döndüğünde "Hoş geldin" kartından kasaya toplarsın. Bir dakikadan kısa ayrılıklar sayılmaz, üretim tam hızla devam eder.
@@ -235,7 +236,7 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `daily_order_complete` | sipariş teslim edildiğinde | tür, hedef, bugün teslim edilen sayı, seri, dükkân seviyesi |
 | `daily_bonus` | üç sipariş de teslim edilip bonus alındığında | seri |
 | `streak_update` | günün ilk teslimi seriyi ilerlettiğinde | seri, kullanılan dondurma hakkı, seri sıfırlandı mı |
-| `earn_virtual_currency` | Altın Çekirdek kazanıldığında (GA4 önerilen olay) | `Altın Çekirdek`, miktar, kaynak (`order`, `daily_bonus`, `streak`) |
+| `earn_virtual_currency` | Altın Çekirdek kazanıldığında (GA4 önerilen olay) | `Altın Çekirdek`, miktar, kaynak (`order`, `daily_bonus`, `streak`, `star`) |
 | `market_shortcut` | telefondaki market kısayoluna basıldığında | yön (`market` / `cup`), alınabilir yükseltme sayısı |
 | `level_up` | dükkân büyüdüğünde | yeni seviye ve adı, toplam aktif oyun dakikası |
 | `spend_virtual_currency` | yükseltme alındığında ya da Altın Çekirdek harcandığında | para birimi, tutar, ne alındığı (`instant_brew` = hızlı demleme), alımdan sonraki adet, dükkân seviyesi |
@@ -243,6 +244,7 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `milestone_reached` | bir üretici kilometre taşına ulaştığında | üretici, adet, yeni çarpan, dükkân seviyesi |
 | `config_rejected` | Remote Config'teki bazı alanlar geçersiz olduğu için atlandığında | atlanan alanlar |
 | `offline_collect` | "Hoş geldin" kartında kazanç toplandığında | uzakta kalınan dakika, depoya sayılan dakika, depo doldu mu, fincan, tutar, depo sınırı (saat) |
+| `star_reached` | bir seviye yıldızına ulaşıldığında | bu şubedeki yıldız sayısı, aynı anda kaç yıldız, dükkân seviyesi, para ödülü |
 | `rush_start` | Kahve Telaşı başladığında | dükkân seviyesi, şube |
 | `rush_end` | telaş bittiğinde | neden (`time` / `hidden`), dokunuş, en yüksek kombo ve çarpan, kazanılan fincan, dükkân seviyesi |
 | `cloud_save` | bulut kaydı açıldığında, kapatıldığında, kodla yüklendiğinde ya da çakışmada | eylem (`enable`, `disable`, `restore`, `conflict`, `keep_local`, `load_remote`), dükkân seviyesi |

@@ -2,7 +2,7 @@
 // Remote Config geldiğinde aynı fonksiyonlar uzaktan gelen sayılarla çalışır.
 
 import { DEFAULT_CONFIG } from './config.js';
-import { advanceStreak, bumpOrders, INITIAL_STREAK, makeDailyOrders } from './orders.js';
+import { advanceStreak, bumpOrders, INITIAL_STREAK, makeDailyOrders, niceNumber } from './orders.js';
 
 // Yükseltmelerin kimlikleri içerikle (ad, görsel) sabittir; Remote Config yalnızca sayılarını değiştirir
 export const UPGRADE_IDS = Object.keys(DEFAULT_CONFIG.upgrades);
@@ -31,10 +31,12 @@ export const INITIAL_STATE = {
   offline: null,
   // Kahve Telaşı bu andan (ms) itibaren yeniden başlatılabilir; 0 = hazır
   rushReadyAt: 0,
+  // Bu şubede alınmış seviye yıldızı sayısı (null: eski kayıt, ödülsüz eşitlenecek)
+  stars: 0,
 };
 
 export function createEconomy(config) {
-  const { shops, upgrades, costGrowth, offline, milestones, milestoneMultiplier, prestige, orders, rush } = config;
+  const { shops, upgrades, costGrowth, offline, milestones, milestoneMultiplier, prestige, orders, rush, stars } = config;
 
   // Yalnızca fincan sayısına göre seviye
   const levelFromCoffees = (coffees) => {
@@ -71,6 +73,24 @@ export function createEconomy(config) {
   const canOpenBranch = (state) => branchUnlocked(state) && reputationGainOf(state) >= 1;
   // Bir sonraki itibar puanı için bu şubede gereken toplam fincan
   const coffeesForGain = (gain) => gain ** 3 * prestige.divisor;
+
+  // Seviye yıldızları: her iki dükkan arasında stars.perLevel eşik. İlk aralık (0'dan) doğrusal, diğerleri
+  // logaritmik: lo × (hi / lo)^(k / (perLevel + 1)); okunur olsun diye iki anlamlı basamağa yuvarlanır.
+  const starThresholds = [];
+  for (let i = 0; i < shops.length - 1; i++) {
+    const lo = shops[i].at;
+    const hi = shops[i + 1].at;
+    for (let k = 1; k <= stars.perLevel; k++) {
+      const f = k / (stars.perLevel + 1);
+      starThresholds.push(niceNumber(lo > 0 ? lo * (hi / lo) ** f : hi * f));
+    }
+  }
+  const starsReachedOf = (coffees) => starThresholds.filter((t) => coffees >= t).length;
+  // Bir dükkan seviyesinin (0'dan) yıldız eşikleri
+  const levelStarsOf = (levelIndex) => starThresholds.slice(levelIndex * stars.perLevel, (levelIndex + 1) * stars.perLevel);
+  // Bir yıldızın para ödülü: rewardSeconds saniyelik kazanç (üretim yoksa tık gücüyle)
+  const starRewardOf = (state) =>
+    stars.rewardSeconds * Math.max(cpsFor(state), perClickFor(state)) * shops[levelOf(state)].price;
 
   // Kahve Telaşı: bir kez açıldıktan sonra (yeni şubelerde de) açık kalır
   const rushUnlocked = (state) => levelOf(state) + 1 >= rush.unlockLevel || (state.branches ?? 1) > 1;
@@ -200,6 +220,21 @@ export function createEconomy(config) {
           daily: bumpOrders(bumpOrders(state.daily, 'tap', 1), 'brew', amount),
         };
       }
+      // Yeni ulaşılan yıldızların ödülleri. Eski kayıtta (stars: null) ödülsüz eşitlenir.
+      case 'claimStars': {
+        const reached = starsReachedOf(state.coffees);
+        if (state.stars === null || state.stars === undefined) return { ...state, stars: reached };
+        if (reached <= state.stars) return state;
+        const count = reached - state.stars;
+        const money = count * starRewardOf(state);
+        return {
+          ...state,
+          stars: reached,
+          gold: state.gold + count * stars.gold,
+          money: state.money + money,
+          earned: state.earned + money,
+        };
+      }
       case 'newBranch': {
         if (!canOpenBranch(state) || state.offline) return state;
         return {
@@ -239,6 +274,10 @@ export function createEconomy(config) {
     branchUnlocked,
     canOpenBranch,
     coffeesForGain,
+    starThresholds,
+    starsReachedOf,
+    levelStarsOf,
+    starRewardOf,
     rushUnlocked,
     rushMultiplierOf,
     rushTapBaseOf,

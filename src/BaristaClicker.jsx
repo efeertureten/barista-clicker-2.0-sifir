@@ -4,6 +4,7 @@ import {
   BellOff,
   Flame,
   MousePointerClick,
+  Star,
   Music,
   RotateCcw,
   ShoppingBag,
@@ -57,6 +58,7 @@ import CloudPanel from './ui/CloudPanel.jsx';
 import FeedbackModal from './ui/FeedbackModal.jsx';
 import NotifyPrompt from './ui/NotifyPrompt.jsx';
 import RushPanel from './ui/RushPanel.jsx';
+import ShopProgress from './ui/ShopProgress.jsx';
 import { planReminders } from './game/reminders.js';
 import {
   cancelReminders,
@@ -158,9 +160,8 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
   const perClick = economy.perClickFor(state);
   const cps = economy.cpsFor(state);
   // Seviye hiç düşmediği için fincan sayısı o dükkanın eşiğinin altında kalabilir (eski kayıt, yeni denge)
-  const shopProgress = nextShop
-    ? Math.min(1, Math.max(0, (state.coffees - shop.at) / (nextShop.at - shop.at)))
-    : 1;
+  // Bu dükkandaki sıradaki yıldız (yoksa null)
+  const nextStar = nextShop ? economy.levelStarsOf(shopIndex).find((t) => t > state.coffees && t < nextShop.at) ?? null : null;
   // Markette: açılmış yükseltmeler ve bir sonraki dükkanda açılacak ilk üretici (hedef olarak)
   const firstLocked = UPGRADES.find((u) => !economy.isUnlocked(u.id, shopIndex));
   const marketUpgrades = UPGRADES.filter((u) => economy.isUnlocked(u.id, shopIndex) || u === firstLocked);
@@ -331,6 +332,34 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     toastTimer.current = setTimeout(() => setToast(null), 3500);
   };
   useEffect(() => () => clearTimeout(toastTimer.current), []);
+
+  // Seviye yıldızları: yeni bir ara hedefe ulaşınca ödül (Altın Çekirdek + birkaç dakikalık kazanç).
+  // Dükkan büyümesiyle aynı anda olursa büyüme bildirimi öne geçer (aşağıdaki etki daha sonra çalışır).
+  const starsReached = economy.starsReachedOf(state.coffees);
+  useEffect(() => {
+    const s = stateRef.current;
+    if (s.stars === null || s.stars === undefined) {
+      dispatch({ type: 'claimStars' }); // eski kayıt: geçmiş yıldızlar ödülsüz sayılır
+      return;
+    }
+    if (starsReached <= s.stars) return;
+    const count = starsReached - s.stars;
+    const money = count * economy.starRewardOf(s);
+    const gold = count * config.stars.gold;
+    dispatch({ type: 'claimStars' });
+    sfx('ting', { maxVoices: 2 });
+    sfx('ting', { delay: 0.22, maxVoices: 2 });
+    showToast({
+      key: `star-${s.branches}-${starsReached}`,
+      title: count > 1 ? `${count} yıldız birden!` : 'Yıldız: ara hedefe ulaştın',
+      subtitle: `+${gold} Altın Çekirdek · +${fmtMoney(money)}`,
+      icon: Star,
+    });
+    analytics.track('star_reached', { stars: starsReached, count, shop_level: economy.levelOf(s) + 1, value: Math.round(money) });
+    if (gold) analytics.track('earn_virtual_currency', { virtual_currency_name: 'Altın Çekirdek', value: gold, source: 'star' });
+    // economy ve config oturum boyunca değişmez
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [starsReached, state.stars]);
 
   // Dükkan büyüdüğünde bildirim ve kapı zili; son seviyede melodi yerine fanfar çalar
   const prevShop = useRef(shopIndex);
@@ -1191,21 +1220,35 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                     </span>
                   )}
                 </div>
-                <div
-                  className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--paper)]"
-                  role="progressbar"
-                  aria-label="Sonraki dükkana ilerleme"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(shopProgress * 100)}
-                >
-                  <div
-                    className="h-full rounded-full bg-[var(--crema)] transition-[width] duration-300"
-                    style={{ width: `${shopProgress * 100}%` }}
+                {nextShop ? (
+                  <ShopProgress
+                    coffees={state.coffees}
+                    points={[shop.at, ...economy.levelStarsOf(shopIndex).filter((t) => t > shop.at && t < nextShop.at), nextShop.at]}
+                    label="Sonraki dükkana ilerleme"
                   />
-                </div>
+                ) : (
+                  <div
+                    className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--paper)]"
+                    role="progressbar"
+                    aria-label="Sonraki dükkana ilerleme"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={100}
+                  >
+                    <div className="h-full w-full rounded-full bg-[var(--crema)]" />
+                  </div>
+                )}
+                {nextStar && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--roast)]">
+                    <Star size={13} strokeWidth={2.2} className="shrink-0 fill-[var(--crema-soft)] text-[var(--crema-deep)]" aria-hidden="true" />
+                    <span>
+                      Sonraki yıldız <strong className="bc-mono font-semibold">{fmt(nextStar)}</strong> fincanda: +
+                      {config.stars.gold} Altın Çekirdek ve {Math.round(config.stars.rewardSeconds / 60)} dk'lık kazanç
+                    </span>
+                  </p>
+                )}
                 {nextShop && (
-                  <p className="mt-2 text-xs text-[var(--muted)]">
+                  <p className="mt-1 text-xs text-[var(--muted)]">
                     Büyüyünce fincan fiyatı {fmtPrice(shop.price)} → {fmtPrice(nextShop.price)}
                     {shopIndex + 2 === config.prestige.unlockLevel && ' · orada yeni şube açabilirsin'}
                   </p>

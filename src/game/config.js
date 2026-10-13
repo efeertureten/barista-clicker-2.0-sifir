@@ -2,7 +2,7 @@
 // uzaktan değiştirebilir (bkz. mergeConfig); bu yüzden içinde metin ya da görsel yok, yalnızca sayılar var.
 // Metinler ve görseller content.js'te, bu sayılarla birleştirilerek kullanılır.
 
-export const APP_VERSION = '2.8.0';
+export const APP_VERSION = '2.9.0';
 
 export const DEFAULT_CONFIG = {
   // Ölçümde hangi dengeyle oynandığını ayırt etmek için (oyuncu özelliği: economy_version)
@@ -95,6 +95,15 @@ export const DEFAULT_CONFIG = {
     comboStep: 0.04,
     comboMax: 2.5,
     comboWindowMs: 700,
+  },
+
+  // Seviye yıldızları: iki dükkan arasında perLevel ara hedef. Eşikler fincan sayısında logaritmik aralıklı
+  // (üretim katlanarak büyüdüğü için yıldızlar zamanda eşit aralıklara yakın düşer). Her yıldız gold Altın Çekirdek
+  // ve rewardSeconds saniyelik kazanç verir. Yeni şubede yıldızlar yeniden kazanılır.
+  stars: {
+    perLevel: 2,
+    gold: 1,
+    rewardSeconds: 120,
   },
 
   // İlk deneyim rehberi. share: yeni oyuncuların rehberi gören payı (1 = herkes, 0.5 = A/B testi).
@@ -243,6 +252,19 @@ export function mergeConfig(base, override) {
       take(`rush.${key}`, o[key], ok, (v) => {
         config.rush[key] = v;
       });
+    });
+  }
+
+  if (override.stars && typeof override.stars === 'object') {
+    const o = override.stars;
+    take('stars.perLevel', o.perLevel, (v) => isInt(v, 0, 4), (v) => {
+      config.stars.perLevel = v;
+    });
+    take('stars.gold', o.gold, (v) => isInt(v, 0, 10), (v) => {
+      config.stars.gold = v;
+    });
+    take('stars.rewardSeconds', o.rewardSeconds, (v) => isNum(v, 0, 3_600), (v) => {
+      config.stars.rewardSeconds = v;
     });
   }
 
