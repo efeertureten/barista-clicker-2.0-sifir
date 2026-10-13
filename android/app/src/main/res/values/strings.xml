@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Barista Clicker</string>
+    <string name="title_activity_main">Barista Clicker</string>
+    <string name="package_name">io.github.efeertureten.baristaclicker</string>
+    <string name="custom_url_scheme">io.github.efeertureten.baristaclicker</string>
+</resources>

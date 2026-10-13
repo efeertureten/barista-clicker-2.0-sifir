@@ -1,0 +1,18 @@
+{
+  "appId": "io.github.efeertureten.baristaclicker",
+  "appName": "Barista Clicker",
+  "webDir": "dist",
+  "backgroundColor": "#f1e6d6",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "cover",
+      "style": "LIGHT"
+    }
+  }
+}

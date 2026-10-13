@@ -33,6 +33,7 @@ function detectDebug() {
 }
 
 export const isConfigured = () => Boolean(FIREBASE_CONFIG) || debug;
+export const isDebug = () => debug;
 export const needsConsent = () => isConfigured() && consent === null;
 export const getConsent = () => consent;
 const isEnabled = () => isConfigured() && consent === 'granted';

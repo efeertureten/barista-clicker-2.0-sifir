@@ -7,3 +7,8 @@ dist/
 # sentetik beta çıktıları
 tools/sentetik-beta/runs/
 tools/sentetik-beta/analysis/
+
+# Android imza anahtarları depoya asla girmez
+*.jks
+*.keystore
+*.p12

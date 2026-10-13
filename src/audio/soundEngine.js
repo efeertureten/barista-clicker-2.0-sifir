@@ -1,5 +1,6 @@
 // Web Audio üstünde küçük bir ses motoru: efektler, varyasyonlar, müzik döngüsü ve müziği kısma.
 import { src } from '../lib/asset.js';
+import { isHidden, onVisibilityChange } from '../platform/native.js';
 
 async function loadBytes(url) {
   // Tek dosyalık derlemelerde sesler data: URL olarak gömülür; fetch'e gerek kalmadan çöz
@@ -171,10 +172,11 @@ export function createSoundEngine(files, musicTrack) {
 
   /* ---- Yaşam döngüsü ---- */
 
-  // Sekme gizlenince her şeyi duraklat, geri gelince sürdür
+  // Sekme ya da uygulama arka plana geçince her şeyi duraklat, geri gelince sürdür
+  let offVisibility = null;
   const onVisibility = () => {
     if (!ctx || disposed) return;
-    if (document.hidden) ctx.suspend().catch(() => {});
+    if (isHidden()) ctx.suspend().catch(() => {});
     else if (wanted()) ctx.resume().catch(() => {});
   };
 
@@ -197,13 +199,13 @@ export function createSoundEngine(files, musicTrack) {
       musicBus.gain.value = MUSIC_LEVEL;
       musicBus.connect(master);
       ctx.addEventListener?.('statechange', flushPending);
-      document.addEventListener('visibilitychange', onVisibility);
+      offVisibility = onVisibilityChange(onVisibility);
       if (sfxOn) {
         warm();
         decodeAll();
       }
     }
-    if (ctx.state !== 'running' && !document.hidden) ctx.resume().catch(() => {});
+    if (ctx.state !== 'running' && !isHidden()) ctx.resume().catch(() => {});
     startMusic();
   };
 
@@ -265,7 +267,7 @@ export function createSoundEngine(files, musicTrack) {
 
   const dispose = () => {
     disposed = true;
-    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility);
+    offVisibility?.();
     ctx?.close().catch(() => {});
   };
 

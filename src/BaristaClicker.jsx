@@ -38,6 +38,7 @@ import MarketShortcut from './ui/MarketShortcut.jsx';
 import { BranchModal, BranchPanel } from './ui/Branch.jsx';
 import DailyOrders from './ui/DailyOrders.jsx';
 import { advanceStreak, dayKeyOf, streakAlive } from './game/orders.js';
+import { PLATFORM, isHidden, onBackButton, onVisibilityChange } from './platform/native.js';
 
 // Büyük sahne görseli yalnızca dikey yer olduğunda (geniş ekranda yan yana düzen ya da uzun ekran) görünür;
 // diğer durumlarda dükkan adının yanında küçük resim gösterilir, böylece fincan ekranın altına itilmez.
@@ -151,25 +152,25 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       tutorial_variant: assigned.variant,
       install_cohort: meta.installCohort,
       app_version: APP_VERSION,
+      platform: PLATFORM,
       economy_version: config.version,
       max_shop_level: shopIndexRef.current + 1,
       sound: readPref(SOUND_PREF_KEY) ? 'on' : 'off',
       music: readPref(MUSIC_PREF_KEY) ? 'on' : 'off',
     });
 
-    // Sekme görünürken her 15 saniyede aktif süreyi biriktir; geri dönüşte 30 dakikayı aşan ara yeni oturumdur
+    // Oyun görünürken her 15 saniyede aktif süreyi biriktir; geri dönüşte 30 dakikayı aşan ara yeni oturumdur
     const HEARTBEAT_S = 15;
     const id = setInterval(() => {
-      if (!document.hidden) meta.heartbeat(Date.now(), HEARTBEAT_S);
+      if (!isHidden()) meta.heartbeat(Date.now(), HEARTBEAT_S);
     }, HEARTBEAT_S * 1000);
-    const onVisibility = () => {
-      if (document.hidden) meta.heartbeat(Date.now(), 0);
+    const offVisibility = onVisibilityChange((hidden) => {
+      if (hidden) meta.heartbeat(Date.now(), 0);
       else beginSession();
-    };
-    document.addEventListener('visibilitychange', onVisibility);
+    });
     return () => {
       clearInterval(id);
-      document.removeEventListener('visibilitychange', onVisibility);
+      offVisibility();
       unsubscribe();
     };
     // Yalnızca açılışta bir kez çalışır
@@ -185,13 +186,13 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     setConsentOpen(false);
   };
 
-  // Oyun döngüsü: üretim yalnızca sekme görünürken tam hızla işler. Sekme arka plandayken saat ilerlemez;
+  // Oyun döngüsü: üretim yalnızca oyun görünürken tam hızla işler. Sekme ya da uygulama arka plandayken saat ilerlemez;
   // geri dönülünce (ya da oyun yeniden açılınca) aradaki süre tek seferde hesaplanır:
   // kısa ayrılık tam hızla eklenir, uzun ayrılık "uzakta" sayılır ve depoya yarım hızla birikir.
   const minAwaySeconds = config.offline.minSeconds;
   useEffect(() => {
     const id = setInterval(() => {
-      if (document.hidden) return;
+      if (isHidden()) return;
       const now = Date.now();
       const dt = (now - activeAtRef.current) / 1000;
       activeAtRef.current = now;
@@ -209,25 +210,24 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     };
     check();
     const id = setInterval(check, 30_000);
-    document.addEventListener('visibilitychange', check);
+    const offVisibility = onVisibilityChange(() => check());
     return () => {
       clearInterval(id);
-      document.removeEventListener('visibilitychange', check);
+      offVisibility();
     };
   }, []);
 
   // Otomatik kayıt
   useEffect(() => {
     const save = () => writeSave(stateRef.current, activeAtRef.current);
-    const onVisibility = () => {
-      if (document.visibilityState === 'hidden') save();
-    };
     const id = setInterval(save, 2000);
-    document.addEventListener('visibilitychange', onVisibility);
+    const offVisibility = onVisibilityChange((hidden) => {
+      if (hidden) save();
+    });
     window.addEventListener('beforeunload', save);
     return () => {
       clearInterval(id);
-      document.removeEventListener('visibilitychange', onVisibility);
+      offVisibility();
       window.removeEventListener('beforeunload', save);
       save();
     };
@@ -696,19 +696,45 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     dispatch({ type: 'reset' });
   };
 
+  // Android geri tuşu: önce açık pencereyi kapatır; kapatacak bir şey yoksa uygulama arka plana alınır
+  const backRef = useRef(() => false);
+  backRef.current = () => {
+    if (branchOpen && branchInfo && branchInfo.gain >= 1) {
+      setBranchOpen(false);
+      return true;
+    }
+    if (state.offline) {
+      handleCollectOffline();
+      return true;
+    }
+    if (confirmReset) {
+      setConfirmReset(false);
+      return true;
+    }
+    return false;
+  };
+  useEffect(() => {
+    const off = onBackButton(() => backRef.current());
+    if (analytics.isDebug()) window.__bcBack = () => backRef.current(); // hata ayıklama: geri tuşunu tarayıcıda dene
+    return () => {
+      off();
+      delete window.__bcBack;
+    };
+  }, []);
+
   return (
     <div
       lang="tr"
       onPointerDown={unlockAudio}
       onKeyDown={unlockAudio}
       className={`bc-root flex min-h-full w-full flex-col bg-[var(--foam)] text-[var(--ink)] lg:grid lg:h-full lg:grid-cols-[minmax(0,1fr)_400px] ${
-        guide || tutorialDone ? 'pb-56 lg:pb-0' : 'pb-24 lg:pb-0'
-      }`}
+        guide || tutorialDone ? 'pb-[calc(env(safe-area-inset-bottom,0px)+14rem)]' : 'pb-[calc(env(safe-area-inset-bottom,0px)+6rem)]'
+      } lg:pb-[env(safe-area-inset-bottom,0px)]`}
     >
       <style>{STYLES}</style>
 
       {/* ---------------- Sol / orta: istatistikler + kahve fincanı ---------------- */}
-      <main className="bc-paper flex min-w-0 flex-col gap-6 px-4 py-5 sm:px-8 sm:py-6 lg:overflow-y-auto">
+      <main className="bc-paper flex min-w-0 flex-col gap-6 px-4 py-5 pt-[calc(env(safe-area-inset-top,0px)+1.25rem)] sm:px-8 sm:py-6 sm:pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] lg:overflow-y-auto">
         <div className="flex flex-1 flex-col gap-6 xl:flex-row xl:items-center xl:gap-10">
           <section
             aria-label="Dükkan durumu"
@@ -961,7 +987,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
         aria-label="Market"
         className="bg-[var(--espresso)] text-[var(--on-dark)] lg:h-full lg:overflow-y-auto"
       >
-        <div className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8">
+        <div className="flex flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8 lg:pt-[calc(env(safe-area-inset-top,0px)+2rem)]">
           <header className="flex items-end justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--on-dark-muted)]">

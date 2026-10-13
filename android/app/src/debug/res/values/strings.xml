@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- Deneme (debug) derlemesi ayrı bir uygulama olarak kurulur (io.github.efeertureten.baristaclicker.deneme);
+     asıl sürümle çakışmaz ve telefonda adından ayırt edilir. -->
+<resources>
+    <string name="app_name">Barista Deneme</string>
+    <string name="title_activity_main">Barista Deneme</string>
+</resources>

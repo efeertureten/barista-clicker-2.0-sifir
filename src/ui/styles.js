@@ -1,9 +1,51 @@
 import textureImg from '../barista-assets/texture-foam.webp';
 import { src } from '../lib/asset.js';
+// Yazı tipleri pakete gömülü: oyun çevrimdışı (Android uygulamasında) da aynı görünür ve izin verilmeden
+// Google'a istek gitmez. Türkçe için latin + latin-ext alt kümeleri yeterli (ğ, ş, İ, ₺ latin-ext'te).
+import bricolageLatin from '@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-opsz-normal.woff2';
+import bricolageLatinExt from '@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-ext-opsz-normal.woff2';
+import figtree400 from '@fontsource/figtree/files/figtree-latin-400-normal.woff2';
+import figtree400Ext from '@fontsource/figtree/files/figtree-latin-ext-400-normal.woff2';
+import figtree500 from '@fontsource/figtree/files/figtree-latin-500-normal.woff2';
+import figtree500Ext from '@fontsource/figtree/files/figtree-latin-ext-500-normal.woff2';
+import figtree600 from '@fontsource/figtree/files/figtree-latin-600-normal.woff2';
+import figtree600Ext from '@fontsource/figtree/files/figtree-latin-ext-600-normal.woff2';
+import figtree700 from '@fontsource/figtree/files/figtree-latin-700-normal.woff2';
+import figtree700Ext from '@fontsource/figtree/files/figtree-latin-ext-700-normal.woff2';
+import plexMono500 from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-500-normal.woff2';
+import plexMono500Ext from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-500-normal.woff2';
+import plexMono600 from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-600-normal.woff2';
+import plexMono600Ext from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-600-normal.woff2';
+
+const LATIN =
+  'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
+const LATIN_EXT =
+  'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF';
+
+const face = (family, weight, latin, latinExt) =>
+  [
+    [latin, LATIN],
+    [latinExt, LATIN_EXT],
+  ]
+    .map(
+      ([file, range]) =>
+        `@font-face { font-family: '${family}'; font-style: normal; font-display: swap; font-weight: ${weight}; src: url('${src(file)}') format('woff2'); unicode-range: ${range}; }`,
+    )
+    .join('\n');
+
+const FONTS = [
+  face('Bricolage Grotesque', '200 800', bricolageLatin, bricolageLatinExt),
+  face('Figtree', 400, figtree400, figtree400Ext),
+  face('Figtree', 500, figtree500, figtree500Ext),
+  face('Figtree', 600, figtree600, figtree600Ext),
+  face('Figtree', 700, figtree700, figtree700Ext),
+  face('IBM Plex Mono', 500, plexMono500, plexMono500Ext),
+  face('IBM Plex Mono', 600, plexMono600, plexMono600Ext),
+].join('\n');
 
 /* Renk ve yazı tipi tokenları, doku, animasyonlar */
 export const STYLES = `
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+${FONTS}
 .bc-root {
   --foam: #f1e6d6;
   --milk: #fbf6ee;
