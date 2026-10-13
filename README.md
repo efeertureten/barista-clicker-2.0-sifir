@@ -132,6 +132,10 @@ src/
     firebaseConfig.js    Firebase yapılandırması (boşken hiçbir yere veri gitmez)
   platform/
     native.js            tarayıcı mı Android mi; görünürlük (ön plan / arka plan) ve geri tuşu
+  cloud/
+    firebaseRest.js      anonim giriş ve Firestore belgeleri (REST, SDK'sız)
+    cloudSave.js         bulut kaydı: kayıt kodu, yedekleme, geri yükleme, çakışma
+    feedback.js          oyun içi geri bildirim
   ui/                    stiller, market kartları ve kısayolu, rehber, günün siparişleri, Yeni Şube paneli ve onayı, ses düğmesi, veri izni bandı, Hoş geldin kartı
   lib/                   localStorage ve dosya yolu yardımcıları
   barista-assets/        oyun görselleri (WebP)
@@ -141,11 +145,31 @@ tools/sentetik-beta/     gerçek oyun kodunu oynayan sentetik oyuncu simülatör
 tools/android/           simge üretici ve sürüm kontrolü
 android/                 Capacitor Android projesi (oyun dosyaları derlemede içine kopyalanır)
 capacitor.config.json    uygulama kimliği, adı, sistem çubukları
+firestore.rules          Firestore güvenlik kuralları (Firebase konsoluna yapıştırılır)
 public/                  favicon, uygulama ikonları ve gizlilik sayfası
 docs/                    README ekran görüntüleri
 ```
 
 Oyun dengesini değiştirmek için yalnızca `src/game/config.js` dosyasına dokunmak yeter; `BaristaClicker` bileşeni farklı bir yapılandırmayı `config` özelliğiyle de alabilir. Bu, ileride değerleri Firebase Remote Config'ten çekip A/B testi yapmanın temeli.
+
+## Bulut kaydı ve geri bildirim
+
+Oyuncu isterse ilerlemesini bulutta yedekler. Alttaki **Bulut kaydı** bağlantısı bir pencere açar: "Bulut kaydını aç" 12 karakterlik bir kayıt kodu üretir (ör. `VB7Y-Q46Q-J7ZB`). Başka bir cihazda (tarayıcı, Android, ileride Play sürümü) "Kodum var" deyip bu kodu yazan kaldığı yerden devam eder.
+
+- **Yedekleme:** Kayıt Firestore'da `saves/<kod>` belgesinde durur. Oyun her 3 dakikada bir (ilerleme anlamlı ölçüde değiştiyse) ve arka plana geçerken yedekler.
+- **Erişim:** Kod hesap yerine geçer. Kurallar listelemeyi yasakladığı için kodlar tahmin edilemez (30¹² ≈ 5×10¹⁷ olasılık). Her istek bir Firebase anonim girişiyle yapılır.
+- **Çakışma:** Her yazma, son bilinen sürüme (`updateTime`) bağlıdır. İki cihaz da oynadıysa oyun hangi kaydın kalacağını sorar; hiçbir ilerleme sessizce ezilmez.
+- **Kapatma:** Bulut kaydı kapatılınca buluttaki kopya silinir.
+- **Veri izninden bağımsız:** Bulut kaydı yalnızca oyuncu açarsa çalışır. Açılmadıkça Firebase'e tek istek gitmez.
+
+**Geri bildirim** bağlantısı küçük bir form açar (Hata / Fikir / Diğer). Mesaj; sürüm, platform ve dükkân seviyesiyle birlikte Firestore'daki `feedback` koleksiyonuna eklenir. Mesajlar Firebase konsolunda, Firestore Database → `feedback` altında okunur; oyuncular birbirininkini göremez.
+
+İkisi de Firebase SDK yerine REST ile çalışır (`src/cloud/`), böylece paket küçük kalır.
+
+**Firebase kurulumu (bir kez):**
+1. Authentication → Get started → Sign-in method → **Anonymous**'u aç.
+2. Firestore Database → Create database. Konum olarak Avrupa'dan birini seç (sonradan değişmez), "production mode" ile başlat.
+3. Firestore Database → Rules: depodaki [`firestore.rules`](firestore.rules) dosyasının tamamını yapıştır → **Publish**.
 
 ## Dengeyi uzaktan değiştirmek (Remote Config)
 
@@ -210,10 +234,12 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `milestone_reached` | bir üretici kilometre taşına ulaştığında | üretici, adet, yeni çarpan, dükkân seviyesi |
 | `config_rejected` | Remote Config'teki bazı alanlar geçersiz olduğu için atlandığında | atlanan alanlar |
 | `offline_collect` | "Hoş geldin" kartında kazanç toplandığında | uzakta kalınan dakika, depoya sayılan dakika, depo doldu mu, fincan, tutar, depo sınırı (saat) |
+| `cloud_save` | bulut kaydı açıldığında, kapatıldığında, kodla yüklendiğinde ya da çakışmada | eylem (`enable`, `disable`, `restore`, `conflict`, `keep_local`, `load_remote`), dükkân seviyesi |
+| `feedback_sent` | geri bildirim gönderildiğinde | tür, uzunluk, dükkân seviyesi |
 | `game_reset` | oyun sıfırlandığında | sıfırlamadan önceki seviye, fincan ve tık sayısı |
 | `app_error` | yakalanmamış bir hata olduğunda | hata türü ve kısa mesajı |
 
-Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `platform` (`web` / `android`), `economy_version` (oyuncunun hangi dengeyle oynadığı), `tutorial_variant` (`guide` rehberli, `control` rehbersiz, `none` rehberden önce başlamış), `max_shop_level`, `branches`, `reputation`, `sound`, `music`. Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
+Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `platform` (`web` / `android`), `economy_version` (oyuncunun hangi dengeyle oynadığı), `tutorial_variant` (`guide` rehberli, `control` rehbersiz, `none` rehberden önce başlamış), `max_shop_level`, `branches`, `reputation`, `sound`, `music`, `cloud_save` (`on` / `off`). Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
 
 ## Görseller ve sesler
 

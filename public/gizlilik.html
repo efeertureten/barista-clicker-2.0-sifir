@@ -59,14 +59,15 @@
     <main>
       <a class="back" href="./">← Oyuna dön</a>
       <h1>Gizlilik</h1>
-      <p class="updated">Son güncelleme: 13 Ekim 2026 (Android uygulaması eklendi)</p>
+      <p class="updated">Son güncelleme: 13 Ekim 2026 (bulut kaydı ve geri bildirim eklendi)</p>
 
       <div class="summary">
         <p>
           Barista Clicker, <strong>yalnızca sen izin verirsen</strong> oynanış verilerini Google Analytics for Firebase
           ile toplar. İzin vermezsen hiçbir veri gönderilmez ve Google'ın ölçüm kodu tarayıcına ya da telefonuna hiç
-          indirilmez. Adın, e-postan ya da telefon numaran toplanmaz; oyunda hesap yoktur. Bu sayfa hem tarayıcıda
-          oynanan oyun hem de Android uygulaması için geçerlidir.
+          indirilmez. Bulut kaydı ve geri bildirim de yalnızca sen kullanırsan çalışır. Adın, e-postan ya da telefon
+          numaran toplanmaz; oyunda hesap yoktur. Bu sayfa hem tarayıcıda oynanan oyun hem de Android uygulaması için
+          geçerlidir.
         </p>
       </div>
 
@@ -115,10 +116,28 @@
         tarafından silinir.
       </p>
 
+      <h2>Bulut kaydı (açarsan)</h2>
+      <p>
+        Oyundaki <strong>Bulut kaydı</strong> penceresinden açarsan ilerlemen (kasa, fincanlar, yükseltmeler, günlük
+        siparişler, oyunun sürümü ve cihaz türü: tarayıcı ya da Android) Google Firebase'in Firestore veritabanında,
+        sana verilen 12 karakterlik bir kayıt kodu altında saklanır. Bunun için Firebase seni anonim bir kullanıcı
+        olarak tanır; ad, e-posta ya da telefon istenmez. Kodu bilen herkes kaydını açabilir, bu yüzden kodu kimseyle
+        paylaşma. Bulut kaydı veri izninden bağımsızdır: yalnızca sen açarsan çalışır. Kapattığında buluttaki kopya
+        silinir.
+      </p>
+
+      <h2>Geri bildirim (gönderirsen)</h2>
+      <p>
+        Oyundaki <strong>Geri bildirim</strong> formundan yazdığın metin; türü (hata, fikir, diğer), oyunun sürümü,
+        dükkân seviyen, cihaz türü ve tarayıcı bilgisi (user agent) ile birlikte Firestore'a kaydedilir ve yalnızca
+        geliştirici tarafından okunur. Metne ad, e-posta ya da telefon yazma. Silinmesini istersen aşağıdaki yoldan
+        yazabilirsin.
+      </p>
+
       <h2>Oyun kaydın</h2>
       <p>
-        Oyundaki ilerlemen yalnızca bu tarayıcının (Android uygulamasında telefonun) yerel deposunda tutulur ve bize
-        gönderilmez. "Oyunu sıfırla" düğmesi, tarayıcı verilerini silmek ya da uygulamayı kaldırmak onu siler.
+        Bulut kaydını açmadıysan ilerlemen yalnızca bu tarayıcının (Android uygulamasında telefonun) yerel deposunda
+        tutulur ve bize gönderilmez. "Oyunu sıfırla" düğmesi, tarayıcı verilerini silmek ya da uygulamayı kaldırmak onu siler.
         Android'in otomatik yedeklemesi açıksa uygulamanın verileri, diğer uygulamalarınki gibi kendi Google
         hesabına yedeklenebilir; bu yedeğe biz erişemeyiz.
       </p>

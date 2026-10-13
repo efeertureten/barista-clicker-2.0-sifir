@@ -21,7 +21,7 @@ import { APP_VERSION } from './game/config.js';
 import { loadActiveConfig } from './game/activeConfig.js';
 import { buildShops, buildUpgrades, districtOf } from './game/content.js';
 import { createEconomy } from './game/economy.js';
-import { hasSave, loadSave, readLastActiveAt, writeSave } from './game/save.js';
+import { SAVE_KEY, hasSave, loadSave, readLastActiveAt, writeSave } from './game/save.js';
 import { createMeta } from './game/meta.js';
 import { assignTutorialVariant, currentTutorialStep, TUTORIAL_STEPS } from './game/tutorial.js';
 import { fmt, fmtMoney, fmtPercent, fmtPrice, fmtRate } from './game/format.js';
@@ -39,6 +39,23 @@ import { BranchModal, BranchPanel } from './ui/Branch.jsx';
 import DailyOrders from './ui/DailyOrders.jsx';
 import { advanceStreak, dayKeyOf, streakAlive } from './game/orders.js';
 import { PLATFORM, isHidden, onBackButton, onVisibilityChange } from './platform/native.js';
+import {
+  adoptCloud,
+  checkCloud,
+  cloudAvailable,
+  cloudState,
+  disableCloud,
+  enableCloud,
+  findCloud,
+  keepLocal,
+  pushCloud,
+} from './cloud/cloudSave.js';
+import { sendFeedback } from './cloud/feedback.js';
+import CloudPanel from './ui/CloudPanel.jsx';
+import FeedbackModal from './ui/FeedbackModal.jsx';
+
+// Bulut kaydı açıksa ilerleme bu aralıkla (değiştiyse) ve oyun arka plana geçince yedeklenir
+const CLOUD_SYNC_MS = 3 * 60 * 1000;
 
 // Büyük sahne görseli yalnızca dikey yer olduğunda (geniş ekranda yan yana düzen ya da uzun ekran) görünür;
 // diğer durumlarda dükkan adının yanında küçük resim gösterilir, böylece fincan ekranın altına itilmez.
@@ -85,8 +102,16 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
   const [tutorial, setTutorial] = useState(null);
   const [tutorialDone, setTutorialDone] = useState(false);
   const [branchOpen, setBranchOpen] = useState(false);
+  // Bulut kaydı: cloud = yerel durum (kod, son yedek) ya da null · cloudPanel = { mode, remote } ya da null
+  const [cloud, setCloud] = useState(() => cloudState());
+  const [cloudPanel, setCloudPanel] = useState(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const stateRef = useRef(state);
+  // Buluttan kayıt yüklenirken otomatik kayıt durur (sayfa yeniden yüklenmeden eski durum üstüne yazılmasın)
+  const freezeSaveRef = useRef(false);
+  // Çakışma çözülene kadar otomatik yedek yazılmaz
+  const cloudConflictRef = useRef(false);
   const onSaveRef = useRef(onSave);
   const cupWrapRef = useRef(null);
   const floaterId = useRef(0);
@@ -157,6 +182,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       max_shop_level: shopIndexRef.current + 1,
       sound: readPref(SOUND_PREF_KEY) ? 'on' : 'off',
       music: readPref(MUSIC_PREF_KEY) ? 'on' : 'off',
+      cloud_save: cloudState() ? 'on' : 'off',
     });
 
     // Oyun görünürken her 15 saniyede aktif süreyi biriktir; geri dönüşte 30 dakikayı aşan ara yeni oturumdur
@@ -219,7 +245,9 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
 
   // Otomatik kayıt
   useEffect(() => {
-    const save = () => writeSave(stateRef.current, activeAtRef.current);
+    const save = () => {
+      if (!freezeSaveRef.current) writeSave(stateRef.current, activeAtRef.current);
+    };
     const id = setInterval(save, 2000);
     const offVisibility = onVisibilityChange((hidden) => {
       if (hidden) save();
@@ -697,9 +725,124 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     dispatch({ type: 'reset' });
   };
 
+  /* ---- Bulut kaydı ---- */
+
+  // Bulutta saklanan anlık görüntü: oyun kaydının aynısı + pencerelerde gösterilen kısa özet
+  const cloudSnapshot = () => ({
+    save: { ...stateRef.current, lastActiveAt: activeAtRef.current },
+    level: shopIndexRef.current + 1,
+    branch: stateRef.current.branches,
+    earned: stateRef.current.earned,
+    coffees: stateRef.current.coffees,
+    platform: PLATFORM,
+    appVersion: APP_VERSION,
+  });
+  const localSummary = { level: shopIndex + 1, branch: state.branches, earned: state.earned };
+
+  // Başka bir cihaz araya yazdı (remote: özeti) ya da kayıt orada kapatıldı (remote: null)
+  const onCloudConflict = (remote) => {
+    if (!remote) {
+      disableCloud({ remove: false });
+      setCloud(null);
+      analytics.setUserProperties({ cloud_save: 'off' });
+      return;
+    }
+    cloudConflictRef.current = true;
+    setCloudPanel({ mode: 'conflict', remote });
+    analytics.track('cloud_save', { action: 'conflict' });
+  };
+  const handlePush = (result) => {
+    if (result && 'conflict' in result) onCloudConflict(result.conflict);
+    else setCloud(cloudState());
+  };
+
+  const turnOnCloud = async () => {
+    await enableCloud(cloudSnapshot());
+    setCloud(cloudState());
+    setCloudPanel({ mode: 'on' });
+    analytics.track('cloud_save', { action: 'enable', shop_level: shopIndex + 1 });
+    analytics.setUserProperties({ cloud_save: 'on' });
+  };
+  const pushCloudNow = async () => handlePush(await pushCloud(cloudSnapshot(), { always: true }));
+  const turnOffCloud = async () => {
+    await disableCloud({ remove: true });
+    setCloud(null);
+    setCloudPanel({ mode: 'off' });
+    analytics.track('cloud_save', { action: 'disable' });
+    analytics.setUserProperties({ cloud_save: 'off' });
+  };
+  // Buluttaki kaydı bu cihaza alır ve oyunu o kayıttan yeniden başlatır
+  const restoreCloud = (code, remote, action = 'restore') => {
+    if (!remote?.save) return;
+    freezeSaveRef.current = true;
+    adoptCloud(code, remote, SAVE_KEY);
+    if (tutorial?.status === 'active') metaRef.current?.setTutorialStatus('done');
+    analytics.track('cloud_save', { action, shop_level: remote.level });
+    setTimeout(() => window.location.reload(), 150);
+  };
+  const keepLocalSave = async () => {
+    await keepLocal(cloudSnapshot());
+    cloudConflictRef.current = false;
+    setCloud(cloudState());
+    setCloudPanel(null);
+    analytics.track('cloud_save', { action: 'keep_local' });
+  };
+
+  // Açılışta: bu kodla başka bir cihaz araya yazmış mı?
+  useEffect(() => {
+    if (!cloudState()) return;
+    checkCloud()
+      .then((r) => {
+        if (r?.conflict) onCloudConflict(r.conflict);
+        else if (r?.gone) onCloudConflict(null);
+      })
+      .catch(() => {});
+    // Yalnızca açılışta
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Açıkken: ilerleme değiştiyse birkaç dakikada bir ve oyun arka plana geçince yedekle
+  const cloudOn = Boolean(cloud);
+  useEffect(() => {
+    if (!cloudOn) return undefined;
+    let stopped = false;
+    const push = (keepalive = false) => {
+      if (stopped || cloudConflictRef.current || freezeSaveRef.current) return;
+      pushCloud(cloudSnapshot(), { keepalive })
+        .then((r) => !stopped && handlePush(r))
+        .catch(() => {}); // ağ yoksa bir sonraki sefere
+    };
+    const id = setInterval(() => {
+      if (!isHidden()) push();
+    }, CLOUD_SYNC_MS);
+    const offVisibility = onVisibilityChange((hidden) => {
+      if (hidden) push(true);
+    });
+    return () => {
+      stopped = true;
+      clearInterval(id);
+      offVisibility();
+    };
+    // cloudSnapshot ve handlePush her çizimde yeniden oluşur ama yalnızca ref'leri okur
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudOn]);
+
+  const submitFeedback = async (kind, text) => {
+    await sendFeedback(kind, text, { appVersion: APP_VERSION, platform: PLATFORM, level: shopIndex + 1, branch: state.branches });
+    analytics.track('feedback_sent', { kind, length: text.trim().length, shop_level: shopIndex + 1 });
+  };
+
   // Android geri tuşu: önce açık pencereyi kapatır; kapatacak bir şey yoksa uygulama arka plana alınır
   const backRef = useRef(() => false);
   backRef.current = () => {
+    if (feedbackOpen) {
+      setFeedbackOpen(false);
+      return true;
+    }
+    if (cloudPanel && cloudPanel.mode !== 'conflict') {
+      setCloudPanel(null);
+      return true;
+    }
     if (branchOpen && branchInfo && branchInfo.gain >= 1) {
       setBranchOpen(false);
       return true;
@@ -959,8 +1102,22 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
         </div>
 
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 xl:mx-0 xl:max-w-none">
-          <p className="min-w-0 text-xs text-[var(--muted)]">
-            {fmt(state.clicks)} tık · İlerlemen bu tarayıcıda otomatik kaydedilir.
+          <p className="min-w-0 text-xs leading-relaxed text-[var(--muted)]">
+            {fmt(state.clicks)} tık
+            {cloudAvailable() ? (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  onClick={() => setCloudPanel({ mode: cloud ? 'on' : 'off' })}
+                  className="underline decoration-[var(--line)] underline-offset-2 hover:text-[var(--roast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)]"
+                >
+                  Bulut kaydı: {cloud ? 'açık' : 'kapalı'}
+                </button>
+              </>
+            ) : (
+              ' · İlerlemen bu cihazda otomatik kaydedilir.'
+            )}
             {analytics.isConfigured() && (
               <>
                 {' · '}
@@ -970,6 +1127,18 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                   className="underline decoration-[var(--line)] underline-offset-2 hover:text-[var(--roast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)]"
                 >
                   Veri izni: {consent === 'granted' ? 'açık' : consent === 'denied' ? 'kapalı' : 'sorulmadı'}
+                </button>
+              </>
+            )}
+            {cloudAvailable() && (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  onClick={() => setFeedbackOpen(true)}
+                  className="underline decoration-[var(--line)] underline-offset-2 hover:text-[var(--roast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)]"
+                >
+                  Geri bildirim
                 </button>
               </>
             )}
@@ -1127,6 +1296,27 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
           onCollect={handleCollectOffline}
         />
       )}
+
+      {/* ---------------- Bulut kaydı ve geri bildirim ---------------- */}
+      {cloudPanel && (
+        <CloudPanel
+          mode={cloudPanel.mode}
+          code={cloud?.code}
+          pushedAt={cloud?.pushedAt}
+          local={localSummary}
+          remote={cloudPanel.remote}
+          shopName={(level) => SHOPS[Math.min(SHOPS.length, Math.max(1, level)) - 1].name}
+          onEnable={turnOnCloud}
+          onPushNow={pushCloudNow}
+          onFind={findCloud}
+          onRestore={(code, remote) => restoreCloud(code, remote)}
+          onDisable={turnOffCloud}
+          onKeepLocal={keepLocalSave}
+          onLoadRemote={(remote) => restoreCloud(cloud.code, remote, 'load_remote')}
+          onClose={() => setCloudPanel(null)}
+        />
+      )}
+      {feedbackOpen && <FeedbackModal onSend={submitFeedback} onClose={() => setFeedbackOpen(false)} />}
 
       {/* ---------------- Veri izni ---------------- */}
       {consentOpen && analytics.isConfigured() && (

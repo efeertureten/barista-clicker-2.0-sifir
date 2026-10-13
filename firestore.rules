@@ -1,0 +1,58 @@
+rules_version = '2';
+
+// Barista Clicker · Firestore kuralları
+// Firebase konsolu → Firestore Database → Rules sekmesine bu dosyanın tamamı yapıştırılıp "Publish" denir.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Bulut kayıtları. Belge kimliği oyuncunun gizli kayıt kodudur (12 karakter); kodu bilen okur ve yazar.
+    // Liste almak yasak: kodlar sayılamaz, tahmin edilemez. Her yazma bir anonim girişle yapılır.
+    match /saves/{code} {
+      allow list: if false;
+      allow get, delete: if request.auth != null && code.matches('[A-Z2-9]{12}');
+      allow create, update: if request.auth != null
+        && code.matches('[A-Z2-9]{12}')
+        && request.resource.data.keys().hasOnly(
+             ['save', 'level', 'branch', 'earned', 'coffees', 'platform', 'appVersion', 'savedAt', 'owner'])
+        && request.resource.data.save is string
+        && request.resource.data.save.size() < 60000
+        && request.resource.data.level is int
+        && request.resource.data.branch is int
+        && request.resource.data.earned is number
+        && request.resource.data.coffees is number
+        && request.resource.data.platform is string
+        && request.resource.data.platform.size() <= 16
+        && request.resource.data.appVersion is string
+        && request.resource.data.appVersion.size() <= 16
+        && request.resource.data.savedAt is timestamp
+        && request.resource.data.owner == request.auth.uid;
+    }
+
+    // Oyun içi geri bildirim: yalnızca eklenir. Okumak yalnızca Firebase konsolundan.
+    match /feedback/{id} {
+      allow read, update, delete: if false;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(
+             ['kind', 'text', 'appVersion', 'platform', 'level', 'branch', 'userAgent', 'sentAt', 'uid'])
+        && request.resource.data.kind in ['bug', 'idea', 'other']
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000
+        && request.resource.data.appVersion is string
+        && request.resource.data.appVersion.size() <= 16
+        && request.resource.data.platform is string
+        && request.resource.data.platform.size() <= 16
+        && request.resource.data.level is int
+        && request.resource.data.branch is int
+        && request.resource.data.userAgent is string
+        && request.resource.data.userAgent.size() <= 200
+        && request.resource.data.sentAt is timestamp
+        && request.resource.data.uid == request.auth.uid;
+    }
+
+    // Geri kalan her şey kapalı
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
