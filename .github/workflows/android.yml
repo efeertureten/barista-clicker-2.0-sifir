@@ -21,7 +21,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # yalnızca etiketlerde sürüm yayını için
+      contents: write # sürüm yayını için
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -48,15 +48,23 @@ jobs:
         id: key
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
-            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
             echo "signed=true" >> "$GITHUB_OUTPUT"
           else
+            # Sır yok: imza ayarlarının çalıştığı geçici bir anahtarla denenir; bu paket dağıtılmaz
+            KEYSTORE_PASSWORD=$(openssl rand -hex 16)
+            echo "::add-mask::$KEYSTORE_PASSWORD"
+            keytool -genkeypair -storetype PKCS12 -keystore "$RUNNER_TEMP/upload.jks" -alias upload \
+              -keyalg RSA -keysize 2048 -validity 2 -storepass "$KEYSTORE_PASSWORD" -keypass "$KEYSTORE_PASSWORD" \
+              -dname "CN=Gecici imza denemesi" 2> /dev/null
             echo "signed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Yükleme anahtarı sırrı yok: yalnızca deneme uygulaması (Barista Deneme) üretiliyor, Play paketi yok."
+            echo "::warning::Yükleme anahtarı sırları yok: deneme uygulaması (Barista Deneme) üretiliyor; imza geçici anahtarla sınanıyor, yayın yok."
           fi
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
 
       - name: İmzasız sürüm yayınlanmaz
         if: startsWith(github.ref, 'refs/tags/v') && steps.key.outputs.signed != 'true'
@@ -66,30 +74,23 @@ jobs:
 
       - name: Derle
         working-directory: android
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           chmod +x gradlew
-          if [ "${{ steps.key.outputs.signed }}" = "true" ]; then
-            ./gradlew --no-daemon assembleRelease bundleRelease
-          else
-            ./gradlew --no-daemon assembleDebug bundleRelease
-          fi
+          TASKS="assembleRelease bundleRelease"
+          if [ "${{ steps.key.outputs.signed }}" != "true" ]; then TASKS="$TASKS assembleDebug"; fi
+          ./gradlew --no-daemon $TASKS
 
-      - name: Paketleri adlandır, imzayı ve sürümü göster
+      - name: Paketleri denetle ve adlandır
         id: out
         run: |
           V=$(node -p "require('./package.json').version")
           echo "version=$V" >> "$GITHUB_OUTPUT"
-          mkdir -p out
-          if [ "${{ steps.key.outputs.signed }}" = "true" ]; then
-            cp android/app/build/outputs/apk/release/app-release.apk "out/barista-clicker-$V.apk"
-            cp android/app/build/outputs/bundle/release/app-release.aab "out/barista-clicker-$V.aab"
-          else
-            cp android/app/build/outputs/apk/debug/app-debug.apk "out/barista-deneme-$V.apk"
-          fi
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          for f in out/*.apk; do
+          CHECK="$APK"
+          [ "${{ steps.key.outputs.signed }}" != "true" ] && CHECK="$CHECK android/app/build/outputs/apk/debug/app-debug.apk"
+          for f in $CHECK; do
             "$BT/apksigner" verify --print-certs "$f" > signer.txt
             "$BT/aapt2" dump badging "$f" > badging.txt
             unzip -l "$f" > files.txt
@@ -100,10 +101,23 @@ jobs:
             PKG=$(sed -n '1p' badging.txt | cut -c1-160)
             SDK=$(grep -E '^(sdkVersion|targetSdkVersion)' badging.txt | tr '\n' ' ' || true)
             LABEL=$(grep -m1 "^application-label:" badging.txt || true)
-            CERT=$(grep -m1 'SHA-256 digest' signer.txt || true)
+            CERT=$(grep -m1 -E 'certificate DN|SHA-256 digest' signer.txt | tr '\n' ' ' || true)
             SIZE=$(du -k "$f" | cut -f1)
-            echo "::notice title=$(basename "$f")::$PKG · $SDK · $LABEL · $SIZE KB · imza $CERT"
+            echo "::notice title=$(basename "$f")::$PKG · $SDK · $LABEL · $SIZE KB · $CERT"
           done
+          jarsigner -verify "$AAB" > aab.txt 2>&1 || true
+          if ! grep -q "jar verified" aab.txt; then
+            echo "::error::AAB imzalı değil"
+            cat aab.txt
+            exit 1
+          fi
+          mkdir -p out
+          if [ "${{ steps.key.outputs.signed }}" = "true" ]; then
+            cp "$APK" "out/barista-clicker-$V.apk"
+            cp "$AAB" "out/barista-clicker-$V.aab"
+          else
+            cp android/app/build/outputs/apk/debug/app-debug.apk "out/barista-deneme-$V.apk"
+          fi
           ls -la out
 
       - uses: actions/upload-artifact@v6
