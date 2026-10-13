@@ -1,7 +1,8 @@
 name: Android paketi
 
 # Her main güncellemesinde Android paketi derlenir ve "Artifacts" altına konur.
-# v* etiketi (ör. v2.5.0) itilince imzalı APK bir GitHub sürümü olarak yayınlanır: arkadaşlar telefondan indirip kurar.
+# İmza sırları varsa ve bu sürüm (package.json) henüz yayınlanmadıysa imzalı APK, v<sürüm> adıyla bir GitHub
+# sürümü olarak yayınlanır: arkadaşlar telefondan indirip kurar. Yani sürüm numarasını artırmak = yeni sürüm.
 # İmza için iki depo sırrı gerekir: ANDROID_KEYSTORE_BASE64 ve ANDROID_KEYSTORE_PASSWORD (README: Android).
 # Sırlar yoksa telefona kurulabilen ayrı bir deneme uygulaması (Barista Deneme) üretilir.
 
@@ -22,12 +23,12 @@ jobs:
     permissions:
       contents: write # yalnızca etiketlerde sürüm yayını için
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -89,25 +90,38 @@ jobs:
           fi
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           for f in out/*.apk; do
-            echo "== $f"
-            "$BT/apksigner" verify --print-certs "$f"
+            "$BT/apksigner" verify --print-certs "$f" > signer.txt
             "$BT/aapt2" dump badging "$f" > badging.txt
-            sed -n '1p;/sdkVersion/p;/application-label:/p' badging.txt
+            unzip -l "$f" > files.txt
+            if ! grep -q 'assets/public/index.html' files.txt; then
+              echo "::error::$f içinde oyun dosyaları yok (assets/public/index.html)"
+              exit 1
+            fi
+            PKG=$(sed -n '1p' badging.txt | cut -c1-160)
+            SDK=$(grep -E '^(sdkVersion|targetSdkVersion)' badging.txt | tr '\n' ' ' || true)
+            LABEL=$(grep -m1 "^application-label:" badging.txt || true)
+            CERT=$(grep -m1 'SHA-256 digest' signer.txt || true)
+            SIZE=$(du -k "$f" | cut -f1)
+            echo "::notice title=$(basename "$f")::$PKG · $SDK · $LABEL · $SIZE KB · imza $CERT"
           done
           ls -la out
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: barista-clicker-android-${{ steps.out.outputs.version }}
           path: out/
           if-no-files-found: error
 
       - name: Sürüm yayını
-        if: startsWith(github.ref, 'refs/tags/v') && steps.key.outputs.signed == 'true'
+        if: steps.key.outputs.signed == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ steps.out.outputs.version }}
         run: |
+          if gh release view "v$V" > /dev/null 2>&1; then
+            echo "v$V zaten yayında; yeni sürüm için package.json ve APP_VERSION artırılır."
+            exit 0
+          fi
           cp "out/barista-clicker-$V.apk" out/barista-clicker.apk
           cat > notes.md <<EOF
           ## Telefona kurulum (Android)
@@ -120,5 +134,6 @@ jobs:
 
           Sürüm $V · Play Store'dan önceki deneme sürümü.
           EOF
-          gh release create "$GITHUB_REF_NAME" out/barista-clicker.apk "out/barista-clicker-$V.apk" \
-            --title "Barista Clicker $V" --notes-file notes.md
+          gh release create "v$V" out/barista-clicker.apk "out/barista-clicker-$V.apk" \
+            --target "$GITHUB_SHA" --title "Barista Clicker $V" --notes-file notes.md
+          echo "::notice title=Yayınlandı::v$V · https://github.com/$GITHUB_REPOSITORY/releases/latest/download/barista-clicker.apk"

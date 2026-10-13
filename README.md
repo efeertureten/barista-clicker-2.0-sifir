@@ -1,8 +1,8 @@
 # Barista Clicker 2.0
 
-Kahve demle, sat, dükkânını seyyar tezgâhtan kahve imparatorluğuna büyüt. React ile yazılmış, tarayıcıda çalışan bir clicker oyunu.
+Kahve demle, sat, dükkânını seyyar tezgâhtan kahve imparatorluğuna büyüt. React ile yazılmış, tarayıcıda ve Android'de çalışan bir clicker oyunu.
 
-**[Tarayıcıda oyna](https://efeertureten.github.io/barista-clicker-2.0-sifir/)**
+**[Tarayıcıda oyna](https://efeertureten.github.io/barista-clicker-2.0-sifir/)** · **[Android için indir (APK)](https://github.com/efeertureten/barista-clicker-2.0-sifir/releases/latest/download/barista-clicker.apk)**
 
 <p>
   <img src="docs/screenshot-desktop.webp" alt="Masaüstü görünüm: solda dükkân kartı ve tıklanan latte, sağda market" width="74%">
@@ -78,7 +78,35 @@ npm run build    # dist/ klasörüne üretim derlemesi
 npm run preview  # derlemeyi yerelde aç
 ```
 
-`main` dalına her push'ta `.github/workflows/deploy.yml` siteyi derleyip GitHub Pages'a yayınlar.
+`main` dalına her push'ta `.github/workflows/deploy.yml` siteyi derleyip GitHub Pages'a yayınlar, `.github/workflows/android.yml` Android paketini derler.
+
+## Android uygulaması
+
+Oyun aynı kodla [Capacitor](https://capacitorjs.com) üzerinden Android uygulaması olarak da paketlenir (`android/` klasörü). Uygulama kimliği `io.github.efeertureten.baristaclicker`. En düşük Android 7 (API 24), hedef Android 16 (API 36); Google Play 31 Ağustos 2026'dan beri yeni uygulamalarda ve güncellemelerde bu hedefi istiyor.
+
+- Oyun dosyaları uygulamanın içinde, yazı tipleri dahil. İnternet olmadan da açılır ve oynanır; yalnızca ölçüm (izin verildiyse) internet ister.
+- Geri tuşu açık pencereyi kapatır (Hoş geldin kartı toplanır, Yeni Şube ve sıfırlama onayı iptal edilir). Kapatacak bir şey yoksa uygulama arka plana alınır, kapanmaz.
+- Uygulama arka plana geçince oyun, tarayıcıda sekme gizlenmiş gibi davranır: üretim çevrimdışı kurallarıyla birikir, müzik durur, oyun kaydedilir. Bunun için `src/platform/native.js` tarayıcının `visibilitychange` olayını Android'in ön plan/arka plan olayıyla birleştirir.
+- Ekran dikey. Çentik ve hareket çubuğu için boşluklar `env(safe-area-inset-*)` ile verilir; sistem çubukları saydam, simgeleri koyu.
+- Kayıt telefonda saklanır; tarayıcıdaki ilerleme uygulamaya geçmez. Android'in otomatik yedeklemesi açık.
+- Ölçümde `platform` oyuncu özelliği `android` olur (tarayıcıda `web`).
+
+**Derleme.** `main`'e her push'ta GitHub Actions paketi derler ve çalıştırmanın "Artifacts" bölümüne koyar. Sürüm `package.json`'dan gelir (`2.5.0` → versionCode `20500`). `src/game/config.js` içindeki `APP_VERSION` ile aynı olmalı, değilse derleme durur. Play her yüklemede daha büyük bir versionCode istediği için her mağaza sürümünde sürüm numarası artırılır.
+
+**İmza.** Play'e yüklenen paket (AAB) ve arkadaşlara dağıtılan APK yükleme anahtarıyla imzalanır. Anahtar depoda değil, iki depo sırrında durur (Settings → Secrets and variables → Actions):
+
+| Sır | İçerik |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | anahtar dosyasının (`.jks`) base64 hâli |
+| `ANDROID_KEYSTORE_PASSWORD` | anahtarın şifresi (takma ad `upload`) |
+
+Sırlar yoksa yalnızca ayrı bir deneme uygulaması üretilir ("Barista Deneme", `…baristaclicker.deneme`); asıl uygulamayla çakışmaz.
+
+**Arkadaşlara dağıtım.** İmza sırları tanımlıysa, `main`'deki sürüm (`package.json`) henüz yayınlanmamışsa derleme imzalı APK'yı `v<sürüm>` adıyla GitHub sürümü olarak yayınlar. Yani sürüm numarasını artırıp `main`'e göndermek yeni bir sürüm çıkarmak demek. [Şu bağlantı](https://github.com/efeertureten/barista-clicker-2.0-sifir/releases/latest/download/barista-clicker.apk) hep en son sürümü indirir. Aynı anahtarla imzalandığı için yeni sürüm eskisinin üstüne kurulur, ilerleme silinmez. Sırları ilk kez ekledikten sonra Actions → "Android paketi" → "Run workflow" ile o anki sürüm yayınlanır.
+
+**Simgeler.** `python3 tools/android/make_icons.py`, uyarlanabilir simgeyi ve eski cihazların açılış ekranını `public/icon-512.png`'den yeniden üretir. Android 12 ve sonrasında açılışta köpük renginde zeminde uygulama simgesi görünür.
+
+**Yerelde.** Android Studio kuruluysa: `npm run android` (derler, Android projesine kopyalar ve Android Studio'da açar).
 
 ## Proje yapısı
 
@@ -102,13 +130,18 @@ src/
     analytics.js         ölçüm katmanı: izin, olay sırası, Firebase ve hata ayıklama çıkışı
     remoteConfig.js      Remote Config'ten "economy" parametresini indirir ve saklar
     firebaseConfig.js    Firebase yapılandırması (boşken hiçbir yere veri gitmez)
+  platform/
+    native.js            tarayıcı mı Android mi; görünürlük (ön plan / arka plan) ve geri tuşu
   ui/                    stiller, market kartları ve kısayolu, rehber, günün siparişleri, Yeni Şube paneli ve onayı, ses düğmesi, veri izni bandı, Hoş geldin kartı
   lib/                   localStorage ve dosya yolu yardımcıları
   barista-assets/        oyun görselleri (WebP)
   barista-sounds/        oyun sesleri (MP3)
   main.jsx, index.css    giriş noktası ve Tailwind
 tools/sentetik-beta/     gerçek oyun kodunu oynayan sentetik oyuncu simülatörü ve analizi
-public/                  favicon ve uygulama ikonları
+tools/android/           simge üretici ve sürüm kontrolü
+android/                 Capacitor Android projesi (oyun dosyaları derlemede içine kopyalanır)
+capacitor.config.json    uygulama kimliği, adı, sistem çubukları
+public/                  favicon, uygulama ikonları ve gizlilik sayfası
 docs/                    README ekran görüntüleri
 ```
 
@@ -180,7 +213,7 @@ Oyun, hangi oyuncuların geri döndüğünü ve nerede takıldığını görmek 
 | `game_reset` | oyun sıfırlandığında | sıfırlamadan önceki seviye, fincan ve tık sayısı |
 | `app_error` | yakalanmamış bir hata olduğunda | hata türü ve kısa mesajı |
 
-Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `economy_version` (oyuncunun hangi dengeyle oynadığı), `tutorial_variant` (`guide` rehberli, `control` rehbersiz, `none` rehberden önce başlamış), `max_shop_level`, `branches`, `reputation`, `sound`, `music`. Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
+Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `platform` (`web` / `android`), `economy_version` (oyuncunun hangi dengeyle oynadığı), `tutorial_variant` (`guide` rehberli, `control` rehbersiz, `none` rehberden önce başlamış), `max_shop_level`, `branches`, `reputation`, `sound`, `music`. Kurulum tarihi ve oturum bilgisi oyun kaydından ayrı tutulur; "Oyunu sıfırla" bunları silmez, böylece geri dönüş oranları bozulmaz. Ölçüm eklenmeden önce oynamaya başlamış oyuncular `legacy_player` olarak işaretlenir, çünkü gerçek kurulum tarihleri bilinmez.
 
 ## Görseller ve sesler
 
