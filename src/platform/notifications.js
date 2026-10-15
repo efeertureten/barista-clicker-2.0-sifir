@@ -7,7 +7,11 @@
 import { IS_NATIVE } from './native.js';
 import { REMINDER_IDS } from '../game/reminders.js';
 
-const CHANNEL = 'dukkan';
+// Kanal ayarları (ses dahil) oluşturulduktan sonra değiştirilemez; ses eklenince yeni kanala geçildi, eskisi silinir.
+const CHANNEL = 'dukkan-v2';
+const OLD_CHANNELS = ['dukkan'];
+// android/app/src/main/res/raw/bildirim.ogg: porselen fincan tıkırtısı ve marimba notası
+const SOUND = 'bildirim.ogg';
 const IDS = Object.values(REMINDER_IDS).map((id) => ({ id }));
 
 const fakeEnabled = () =>
@@ -29,7 +33,11 @@ function makeFake() {
       log.calls.push('request');
       return { display: log.permission };
     },
-    createChannel: async () => log.calls.push('channel'),
+    createChannel: async (c) => {
+      log.calls.push('channel');
+      log.channel = c;
+    },
+    deleteChannel: async ({ id }) => log.calls.push(`delete:${id}`),
     schedule: async ({ notifications }) => {
       log.calls.push('schedule');
       log.scheduled = notifications.map((n) => ({ ...n, at: n.schedule.at.getTime() }));
@@ -66,15 +74,18 @@ export const preloadNotifications = () => load().catch(() => {});
 
 let channel = null;
 const ensureChannel = (plugin) => {
-  channel ??= Promise.resolve(
-    plugin.createChannel({
-      id: CHANNEL,
-      name: 'Dükkân hatırlatmaları',
-      description: 'Depo dolunca ve günün siparişleri gelince',
-      importance: 3,
-      visibility: 1,
-    }),
-  ).catch(() => {});
+  channel ??= Promise.all(OLD_CHANNELS.map((id) => Promise.resolve(plugin.deleteChannel?.({ id })).catch(() => {})))
+    .then(() =>
+      plugin.createChannel({
+        id: CHANNEL,
+        name: 'Dükkân hatırlatmaları',
+        description: 'Depo dolunca ve günün siparişleri gelince',
+        importance: 3,
+        visibility: 1,
+        sound: SOUND,
+      }),
+    )
+    .catch(() => {});
   return channel;
 };
 
@@ -93,6 +104,7 @@ export async function scheduleReminders(plan) {
       body: n.body,
       schedule: { at: new Date(n.at), allowWhileIdle: true },
       channelId: CHANNEL,
+      sound: SOUND, // Android 7: kanal yok, ses bildirimin kendisinde
       smallIcon: 'ic_stat_cup',
       iconColor: '#9C5F1E',
       autoCancel: true,

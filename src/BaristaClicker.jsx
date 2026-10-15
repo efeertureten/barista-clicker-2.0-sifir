@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
-  Bell,
   BellOff,
   Flame,
   MousePointerClick,
@@ -61,6 +60,7 @@ import RushPanel from './ui/RushPanel.jsx';
 import starImg from './barista-assets/star.webp';
 import rushImg from './barista-assets/rush.webp';
 import confettiImg from './barista-assets/confetti.webp';
+import bellImg from './barista-assets/icon-bell.webp';
 import ShopProgress from './ui/ShopProgress.jsx';
 import { planReminders } from './game/reminders.js';
 import {
@@ -364,8 +364,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     const money = count * economy.starRewardOf(s);
     const gold = count * config.stars.gold;
     dispatch({ type: 'claimStars' });
-    sfx('ting', { maxVoices: 2 });
-    sfx('ting', { delay: 0.22, maxVoices: 2 });
+    sfx('star', { maxVoices: 1 });
     showToast({
       key: `star-${s.branches}-${starsReached}`,
       title: count > 1 ? `${count} yıldız birden!` : 'Yıldız: ara hedefe ulaştın',
@@ -957,8 +956,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       shopLevel: shopIndex + 1,
     };
     setRushActive(true);
-    sfx('ting', { maxVoices: 2 });
-    sfx('ting', { delay: 0.12, maxVoices: 2 });
+    sfx('rushStart', { maxVoices: 1 });
     analytics.track('rush_start', { shop_level: shopIndex + 1, branch: state.branches });
   };
 
@@ -967,7 +965,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     if (!run) return;
     rushRef.current = null;
     setRushActive(false);
-    sfx('ting', { maxVoices: 2 });
+    sfx('rushEnd', { maxVoices: 1 });
     if (run.taps > 0) {
       showToast({
         key: `rush-${run.startedAt}`,
@@ -1026,6 +1024,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       granted = false;
     }
     setNotifyPref(granted ? 'on' : 'off');
+    if (granted) sfx('notify', { maxVoices: 1 }); // bildirimlerin sesi böyle olacak
     analytics.track('notification_permission', { result: granted ? 'granted' : 'denied', source });
     if (!granted) {
       showToast({
@@ -1040,7 +1039,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
   const acceptNotifyPrompt = async () => {
     setNotifyPromptOpen(false);
     if (await enableNotifications('prompt')) {
-      showToast({ key: `notify-${Date.now()}`, title: 'Tamam, haber vereceğiz', subtitle: 'Depo dolunca ve siparişler gelince.', icon: Bell });
+      showToast({ key: `notify-${Date.now()}`, title: 'Tamam, haber vereceğiz', subtitle: 'Depo dolunca ve siparişler gelince.', image: bellImg });
     }
   };
   const declineNotifyPrompt = () => {

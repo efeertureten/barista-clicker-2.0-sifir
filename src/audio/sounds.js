@@ -12,6 +12,10 @@ import levelUpSfx from '../barista-sounds/level-up.mp3';
 import empireSfx from '../barista-sounds/empire.mp3';
 import ting1 from '../barista-sounds/ting-1.mp3';
 import ting2 from '../barista-sounds/ting-2.mp3';
+import rushStartSfx from '../barista-sounds/rush-start.mp3';
+import rushEndSfx from '../barista-sounds/rush-end.mp3';
+import starSfx from '../barista-sounds/star.mp3';
+import notifySfx from '../barista-sounds/notify.mp3';
 import musicLoop from '../barista-sounds/music-loop.mp3';
 
 export const SOUNDS = {
@@ -24,6 +28,10 @@ export const SOUNDS = {
   levelUp: [levelUpSfx], // dükkan büyüdü: zilin ardından
   empire: [empireSfx], // son seviye: zilin ardından
   ting: [ting1, ting2], // bir yükseltme alınabilir hale geldi
+  rushStart: [rushStartSfx], // Kahve Telaşı başladı: yükselen hışırtı ve marimba akoru
+  rushEnd: [rushEndSfx], // telaş bitti: inen iki marimba notası
+  star: [starSfx], // yıldız: yükselen parıltılı marimba
+  notify: [notifySfx], // bildirimler açıldı: Android bildirim sesinin (res/raw/bildirim.ogg) oyun içi önizlemesi
 };
 
 // Arka plan müziği: ilk çalışta girişten başlar, sonra [loopStart, loopEnd) arası kesintisiz döner.
