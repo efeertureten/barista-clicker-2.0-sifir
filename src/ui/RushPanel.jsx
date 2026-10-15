@@ -2,6 +2,7 @@ import React from 'react';
 import { Timer } from 'lucide-react';
 
 import rushImg from '../barista-assets/rush.webp';
+import sparksImg from '../barista-assets/sparks.webp';
 import { fmt, fmtDuration } from '../game/format.js';
 import { src } from '../lib/asset.js';
 
@@ -12,12 +13,22 @@ const multText = (m) => `×${m.toLocaleString('tr-TR', { minimumFractionDigits: 
 export default function RushPanel({ status, readyIn, cfg, run, now, onStart }) {
   if (status === 'active' && run) {
     const left = Math.max(0, (run.endsAt - now) / 1000);
+    // Kıvılcımlar kombo yükseldikçe belirginleşir
+    const heat = Math.min(1, Math.max(0, (run.mult - 1) / (cfg.comboMax - 1)));
     return (
       <section
         aria-label="Kahve Telaşı"
-        className="w-full max-w-xs overflow-hidden rounded-2xl border border-[var(--crema)] bg-[var(--ink)] text-[var(--on-dark)] shadow-[0_18px_40px_-24px_rgba(43,26,17,0.8)]"
+        className="relative w-full max-w-xs overflow-hidden rounded-2xl border border-[var(--crema)] bg-[var(--ink)] text-[var(--on-dark)] shadow-[0_18px_40px_-24px_rgba(43,26,17,0.8)]"
       >
-        <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-3">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 transition-opacity duration-500"
+          style={{ opacity: 0.35 + 0.65 * heat, mixBlendMode: 'screen' }}
+        >
+          <img src={src(sparksImg)} alt="" draggable={false} className="bc-sparks" />
+          <img src={src(sparksImg)} alt="" draggable={false} className="bc-sparks bc-sparks-b" />
+        </div>
+        <div className="relative flex items-center justify-between gap-3 px-4 pb-2 pt-3">
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--crema)]">
               <img src={src(rushImg)} alt="" width={14} height={18} draggable={false} className="bc-img h-[18px] w-auto" /> Kahve Telaşı
@@ -30,7 +41,7 @@ export default function RushPanel({ status, readyIn, cfg, run, now, onStart }) {
             {multText(run.mult)}
           </p>
         </div>
-        <div className="px-4 pb-3">
+        <div className="relative px-4 pb-3">
           <div className="h-1.5 overflow-hidden rounded-full bg-[var(--espresso-3)]">
             <div className="bc-rush-bar h-full rounded-full bg-[var(--crema)]" style={{ animationDuration: `${cfg.seconds}s` }} />
           </div>

@@ -10,6 +10,14 @@ import roasterUpgradeImg from '../barista-assets/upgrade-roaster.webp';
 import truckUpgradeImg from '../barista-assets/upgrade-truck.webp';
 import dealersUpgradeImg from '../barista-assets/upgrade-dealers.webp';
 import plantationUpgradeImg from '../barista-assets/upgrade-plantation.webp';
+import kadikoyImg from '../barista-assets/district-kadikoy.webp';
+import kadikoyNightImg from '../barista-assets/district-kadikoy-night.webp';
+import balatImg from '../barista-assets/district-balat.webp';
+import balatNightImg from '../barista-assets/district-balat-night.webp';
+import besiktasImg from '../barista-assets/district-besiktas.webp';
+import besiktasNightImg from '../barista-assets/district-besiktas-night.webp';
+import modaImg from '../barista-assets/district-moda.webp';
+import modaNightImg from '../barista-assets/district-moda-night.webp';
 import shop1Img from '../barista-assets/shop-1-tezgah.webp';
 import shop1Thumb from '../barista-assets/shop-1-tezgah-thumb.webp';
 import shop2Img from '../barista-assets/shop-2-kose-kafe.webp';
@@ -111,6 +119,23 @@ export function buildShops(config) {
 
 // Yeni şubelerin açıldığı semtler, sırayla. İlk dükkanın semti yok; 2. şube Kadıköy'de açılır.
 export const DISTRICTS = ['Kadıköy', 'Balat', 'Beşiktaş', 'Moda', 'Cihangir', 'Üsküdar', 'Karaköy', 'Kuzguncuk', 'Arnavutköy', 'Bebek', 'Fener', 'Nişantaşı'];
+
+// Yeni Şube penceresindeki semt sahneleri. 20:00–06:00 arası gece hali gösterilir; sahnesi olmayan semtte pencere
+// sahnesiz açılır.
+const DISTRICT_SCENES = {
+  Kadıköy: { day: kadikoyImg, night: kadikoyNightImg },
+  Balat: { day: balatImg, night: balatNightImg },
+  Beşiktaş: { day: besiktasImg, night: besiktasNightImg },
+  Moda: { day: modaImg, night: modaNightImg },
+};
+
+export function districtScene(district, date = new Date()) {
+  const scene = DISTRICT_SCENES[district];
+  if (!scene) return null;
+  const hour = date.getHours();
+  const night = hour >= 20 || hour < 6;
+  return { image: night ? scene.night : scene.day, night };
+}
 
 // branch: şube numarası (1 = ilk dükkan). Liste bitince "N. şube" olarak devam eder.
 export function districtOf(branch) {

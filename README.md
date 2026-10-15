@@ -265,7 +265,14 @@ Bütün görseller ve sesler Google Gemini ile üretildi. Nesnelerin yeşil zemi
 
 **Açılış ekranı.** Oyun espresso renginde bir açılış ekranıyla başlar: amblem, ad ve fincandan yükselen buhar. İlk açılışta "Demle, sat, büyü." sloganıyla yaklaşık 2 saniye, sonraki açılışlarda 1 saniyeden kısa sürer; dokununca hemen geçilir. Buhar, Gemini videosundan kesilmiş dikişsiz bir döngüdür (`steam.webm`, Safari için `steam.mp4`; sessiz, 5,5 sn). "Hareketi azalt" açıksa video yüklenmez. `?debug=1` ile açılış ekranı atlanır; `?intro=1` her durumda gösterir, `?intro=0` gizler.
 
-**Şeffaf simgeler.** Gemini görselleri yeşil zeminde üretilir. `python3 tools/assets/key_green.py <girdi> <çıktı.webp> <en uzun kenar px> [kalite]` zemini kenarlardan ölçer, yarı saydam kenarlardaki yeşili geri çözer (buhar ve parlamalar yeşilimsi kalmasın diye) ve nesneye göre kırpar. Amblem, Altın Çekirdek, yıldız ve Kahve Telaşı simgesi böyle üretildi.
+**Şeffaf simgeler.** Gemini görselleri yeşil zeminde üretilir. `python3 tools/assets/key_green.py <girdi> <çıktı.webp> <en uzun kenar px> [kalite]` zemini kenarlardan ölçer, yarı saydam kenarlardaki yeşili geri çözer (buhar ve parlamalar yeşilimsi kalmasın diye) ve nesneye göre kırpar. Amblem, Altın Çekirdek, yıldız, Kahve Telaşı simgesi, pencerelerdeki bulut, zil ve zarf simgeleri ve çekirdek konfetisi böyle üretildi.
+
+**Oyun içi efektler.**
+- Kahve Telaşı panelinin arkasında altın kıvılcımlar yükselir, kombo arttıkça belirginleşir. Görsel siyah zeminde (`sparks.webp`); siyah, `screen` karışımıyla erir.
+- Dükkan büyüyünce ve yeni şube açılınca fincanın üstünde çekirdek ve karton bardak konfetisi patlar (`confetti.webp`).
+- Bulut kaydı, bildirim sorusu ve geri bildirim pencerelerinin başında kil simgeler var (`Modal`'ın `art` özelliği).
+- Yeni Şube penceresi açılacak semtin sahnesini gösterir; 20:00–06:00 arası gece hali (`district-<semt>.webp`, `district-<semt>-night.webp`, `content.js` → `districtScene`). Şimdilik Kadıköy, Balat, Beşiktaş ve Moda'nın sahnesi var; diğer semtlerde pencere sahnesiz açılır.
+- "Hareketi azalt" açıksa konfeti gösterilmez, kıvılcımlar durağan kalır.
 
 **Mağaza görselleri.** Hepsi gerçek oyundan üretilir, elle düzenlenmez:
 

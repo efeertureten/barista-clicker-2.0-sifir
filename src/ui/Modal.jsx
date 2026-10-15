@@ -1,9 +1,12 @@
 import React from 'react';
 import { X } from 'lucide-react';
 
+import { src } from '../lib/asset.js';
+
 // Ortak pencere kabuğu: karartılmış arka plan, ortada süt rengi kart, başlık ve kapatma düğmesi.
 // Arka plana tıklamak ve Esc kapatır (onClose verilmediyse kapatılamaz: oyuncu bir seçim yapmalı).
-export default function Modal({ id, eyebrow, title, onClose, children, wide = false }) {
+// art: başlığın solundaki küçük kil simge (bulut, zil, zarf)
+export default function Modal({ id, eyebrow, title, art, onClose, children, wide = false }) {
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(36,21,13,0.55)] p-4 backdrop-blur-[2px]"
@@ -19,7 +22,17 @@ export default function Modal({ id, eyebrow, title, onClose, children, wide = fa
         }`}
       >
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          {art && (
+            <img
+              src={src(art)}
+              alt=""
+              width={56}
+              height={56}
+              draggable={false}
+              className="bc-img bc-pop -ml-1 h-14 w-14 shrink-0 object-contain drop-shadow-[0_8px_10px_rgba(43,26,17,0.18)]"
+            />
+          )}
+          <div className="min-w-0 flex-1">
             {eyebrow && (
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--crema-deep)]">{eyebrow}</p>
             )}

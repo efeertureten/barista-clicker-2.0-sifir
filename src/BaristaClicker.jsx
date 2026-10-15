@@ -60,6 +60,7 @@ import NotifyPrompt from './ui/NotifyPrompt.jsx';
 import RushPanel from './ui/RushPanel.jsx';
 import starImg from './barista-assets/star.webp';
 import rushImg from './barista-assets/rush.webp';
+import confettiImg from './barista-assets/confetti.webp';
 import ShopProgress from './ui/ShopProgress.jsx';
 import { planReminders } from './game/reminders.js';
 import {
@@ -113,6 +114,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
   const [floaters, setFloaters] = useState([]);
   const [bump, setBump] = useState(0);
   const [toast, setToast] = useState(null);
+  const [confetti, setConfetti] = useState(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [soundOn, setSoundOn] = useState(() => readPref(SOUND_PREF_KEY));
   const [musicOn, setMusicOn] = useState(() => readPref(MUSIC_PREF_KEY));
@@ -330,6 +332,17 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
 
   // Kısa bildirim (dükkan büyüdü, kilometre taşı): 3,5 sn sonra kendiliğinden kapanır
   const toastTimer = useRef(null);
+  // Çekirdek konfetisi: fincan ekrandaysa onun üstünde, değilse ekranın ortasında patlar
+  const celebrate = (atCup) => {
+    const rect = atCup ? document.getElementById('bc-cup')?.getBoundingClientRect() : null;
+    const onScreen = rect && rect.bottom > 0 && rect.top < window.innerHeight;
+    setConfetti({
+      id: Date.now(),
+      x: onScreen ? rect.left + rect.width / 2 : window.innerWidth / 2,
+      y: onScreen ? rect.top + rect.height * 0.45 : window.innerHeight * 0.42,
+    });
+  };
+
   const showToast = (next) => {
     clearTimeout(toastTimer.current);
     setToast(next);
@@ -375,6 +388,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       soundRef.current?.duckMusic(isFinal ? 9.5 : 5.5);
       soundRef.current?.play('bell', { maxVoices: 1 });
       soundRef.current?.play(isFinal ? 'empire' : 'levelUp', { delay: 0.3, maxVoices: 1 });
+      celebrate(true);
       analytics.track('level_up', {
         level: shopIndex + 1,
         level_name: SHOPS[shopIndex].name,
@@ -779,6 +793,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     soundRef.current?.duckMusic(5.5);
     sfx('bell', { maxVoices: 1 });
     sfx('levelUp', { delay: 0.3, maxVoices: 1 });
+    celebrate(false);
     showToast({
       key: `branch-${branch}`,
       title: `Yeni şube: ${district}`,
@@ -1534,6 +1549,20 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
           </div>
         </div>
       </aside>
+
+      {confetti && (
+        <img
+          key={confetti.id}
+          src={src(confettiImg)}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          data-testid="confetti"
+          className="bc-img bc-confetti"
+          style={{ left: confetti.x, top: confetti.y }}
+          onAnimationEnd={() => setConfetti(null)}
+        />
+      )}
 
       {/* ---------------- Bildirim: dükkan büyüdü, kilometre taşı ---------------- */}
       {toast && (

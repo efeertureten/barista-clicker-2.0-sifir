@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Cloud, Copy, KeyRound, LoaderCircle, RefreshCw, TriangleAlert } from 'lucide-react';
 
+import cloudImg from '../barista-assets/icon-cloud.webp';
 import Modal, { primaryButton, secondaryButton } from './Modal.jsx';
 import { fmtDuration, fmtMoney } from '../game/format.js';
 import { formatCode, normalizeCode } from '../cloud/cloudSave.js';
@@ -120,7 +121,7 @@ export default function CloudPanel({
   /* ---- Çakışma ---- */
   if (mode === 'conflict' && remote) {
     return (
-      <Modal id="bc-cloud" eyebrow="Bulut kaydı" title="Hangi kayıt kalsın?">
+      <Modal id="bc-cloud" art={cloudImg} eyebrow="Bulut kaydı" title="Hangi kayıt kalsın?">
         <p className="mt-1 text-sm leading-snug text-[var(--roast)]">
           Bu kayıt kodunla başka bir cihazda da oynanmış. İkisi birleşemez; birini seç, öteki silinir.
         </p>
@@ -145,7 +146,7 @@ export default function CloudPanel({
   if (view === 'found' && found) {
     const losing = local.earned > 0;
     return (
-      <Modal id="bc-cloud" eyebrow="Bulut kaydı" title="Kayıt bulundu" onClose={onClose}>
+      <Modal id="bc-cloud" art={cloudImg} eyebrow="Bulut kaydı" title="Kayıt bulundu" onClose={onClose}>
         <div className="mt-3 flex flex-col gap-2">
           <SaveSummary label={formatCode(found.code)} s={found.remote} shopName={shopName} now={now} tone="accent" />
           {losing && <SaveSummary label="Bu cihazdaki (yerine geçecek)" s={local} shopName={shopName} now={now} />}
@@ -169,7 +170,7 @@ export default function CloudPanel({
 
   if (view === 'enter') {
     return (
-      <Modal id="bc-cloud" eyebrow="Bulut kaydı" title="Kayıt kodunu yaz" onClose={onClose}>
+      <Modal id="bc-cloud" art={cloudImg} eyebrow="Bulut kaydı" title="Kayıt kodunu yaz" onClose={onClose}>
         <p className="mt-1 text-sm leading-snug text-[var(--roast)]">
           Öteki cihazda <strong>Bulut kaydı</strong> penceresindeki 12 karakterlik kod.
         </p>
@@ -212,7 +213,7 @@ export default function CloudPanel({
   /* ---- Açık ---- */
   if (mode === 'on') {
     return (
-      <Modal id="bc-cloud" eyebrow="Bulut kaydı açık" title="Kayıt kodun" onClose={onClose}>
+      <Modal id="bc-cloud" art={cloudImg} eyebrow="Bulut kaydı açık" title="Kayıt kodun" onClose={onClose}>
         <div className="mt-4 flex items-center gap-2 rounded-2xl bg-[var(--foam)] py-2 pl-4 pr-2">
           <p className="bc-mono min-w-0 flex-1 text-xl font-semibold tracking-[0.1em]" aria-label="Kayıt kodu">
             {formatCode(code)}
@@ -260,7 +261,7 @@ export default function CloudPanel({
 
   /* ---- Kapalı ---- */
   return (
-    <Modal id="bc-cloud" eyebrow="Bulut kaydı" title="İlerlemeni koru" onClose={onClose}>
+    <Modal id="bc-cloud" art={cloudImg} eyebrow="Bulut kaydı" title="İlerlemeni koru" onClose={onClose}>
       <p className="mt-1 text-sm leading-snug text-[var(--roast)]">
         İlerlemen şu an yalnızca bu cihazda. Bulut kaydını açarsan sana bir kayıt kodu verilir; telefon değiştirirken,
         uygulamayı yeniden kurarken ya da tarayıcıdan uygulamaya geçerken bu kodla kaldığın yerden devam edersin.

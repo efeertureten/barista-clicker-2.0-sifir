@@ -1,7 +1,9 @@
 import React from 'react';
 import { Award, Check, RotateCcw, Store } from 'lucide-react';
 
+import { districtScene } from '../game/content.js';
 import { fmt, fmtRate } from '../game/format.js';
+import { src } from '../lib/asset.js';
 
 const mult = (boost) => `×${fmtRate(boost)}`;
 
@@ -67,6 +69,7 @@ export function BranchPanel({ info, onOpen }) {
 // Onay: ne kazanılır, ne sıfırlanır, ne kalır. Kazanılan itibar kalıcıdır, geri alınamaz.
 export function BranchModal({ info, reputation, onConfirm, onCancel }) {
   const { district, gain, boostAfter } = info;
+  const scene = districtScene(district);
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(36,21,13,0.55)] p-4 backdrop-blur-[2px]"
@@ -77,57 +80,76 @@ export function BranchModal({ info, reputation, onConfirm, onCancel }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="bc-branch-title"
-        className="bc-rise w-full max-w-sm rounded-[28px] border border-[var(--line)] bg-[var(--milk)] p-5 text-[var(--ink)] shadow-[0_40px_80px_-30px_rgba(0,0,0,0.7)]"
+        className="bc-rise max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-[28px] border border-[var(--line)] bg-[var(--milk)] text-[var(--ink)] shadow-[0_40px_80px_-30px_rgba(0,0,0,0.7)]"
       >
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--crema-deep)]">Yeni şube</p>
-        <h2 id="bc-branch-title" className="bc-display mt-1 text-2xl font-extrabold">
-          {district}
-        </h2>
-        <p className="mt-1 text-sm leading-snug text-[var(--roast)]">
-          İmparatorluğun başka bir semtte, seyyar bir tezgâhla yeniden başlıyor. Bu sefer itibarın seninle.
-        </p>
-
-        <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[var(--foam)] px-4 py-3">
-          <Award size={28} strokeWidth={1.8} className="shrink-0 text-[var(--crema-deep)]" aria-hidden="true" />
-          <div>
-            <p className="bc-mono text-2xl font-semibold text-[var(--crema-deep)]">+{fmt(gain)} itibar</p>
-            <p className="text-xs text-[var(--muted)]">
-              Toplam {fmt(reputation + gain)} · üretim ve tık gücü {mult(boostAfter)}
-            </p>
+        {scene && (
+          <div
+            className="relative aspect-[16/9] overflow-hidden border-b border-[var(--line)]"
+            style={{ backgroundColor: scene.night ? '#091224' : '#dec29c' }}
+          >
+            <img
+              src={src(scene.image)}
+              alt=""
+              width={880}
+              height={492}
+              draggable={false}
+              data-testid="branch-scene"
+              data-night={scene.night ? 'true' : 'false'}
+              className="bc-img bc-scene-in absolute inset-0 h-full w-full object-cover"
+            />
           </div>
-        </div>
+        )}
+        <div className="p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--crema-deep)]">Yeni şube</p>
+          <h2 id="bc-branch-title" className="bc-display mt-1 text-2xl font-extrabold">
+            {district}
+          </h2>
+          <p className="mt-1 text-sm leading-snug text-[var(--roast)]">
+            İmparatorluğun başka bir semtte, seyyar bir tezgâhla yeniden başlıyor. Bu sefer itibarın seninle.
+          </p>
 
-        <ul className="mt-4 space-y-2 text-[13px] leading-snug">
-          <li className="flex gap-2">
-            <Check size={16} strokeWidth={2.6} className="mt-0.5 shrink-0 text-[var(--crema-deep)]" aria-hidden="true" />
-            <span>
-              <strong>Kalır:</strong> itibar, toplam kazanç, tık sayısı
-            </span>
-          </li>
-          <li className="flex gap-2">
-            <RotateCcw size={16} strokeWidth={2.4} className="mt-0.5 shrink-0 text-[var(--muted)]" aria-hidden="true" />
-            <span>
-              <strong>Sıfırlanır:</strong> kasa, fincanlar, yükseltmeler, dükkan seviyesi
-            </span>
-          </li>
-        </ul>
+          <div className="mt-4 flex items-center gap-3 rounded-2xl bg-[var(--foam)] px-4 py-3">
+            <Award size={28} strokeWidth={1.8} className="shrink-0 text-[var(--crema-deep)]" aria-hidden="true" />
+            <div>
+              <p className="bc-mono text-2xl font-semibold text-[var(--crema-deep)]">+{fmt(gain)} itibar</p>
+              <p className="text-xs text-[var(--muted)]">
+                Toplam {fmt(reputation + gain)} · üretim ve tık gücü {mult(boostAfter)}
+              </p>
+            </div>
+          </div>
 
-        <div className="mt-5 flex gap-2">
-          <button
-            type="button"
-            autoFocus
-            onClick={onConfirm}
-            className="flex-1 rounded-full bg-[var(--ink)] px-5 py-3 text-sm font-semibold text-[var(--on-dark)] transition hover:bg-[var(--roast)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--milk)]"
-          >
-            Şubeyi aç
-          </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-full border border-[var(--line)] px-5 py-3 text-sm font-semibold text-[var(--roast)] transition hover:border-[var(--roast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)]"
-          >
-            Vazgeç
-          </button>
+          <ul className="mt-4 space-y-2 text-[13px] leading-snug">
+            <li className="flex gap-2">
+              <Check size={16} strokeWidth={2.6} className="mt-0.5 shrink-0 text-[var(--crema-deep)]" aria-hidden="true" />
+              <span>
+                <strong>Kalır:</strong> itibar, toplam kazanç, tık sayısı
+              </span>
+            </li>
+            <li className="flex gap-2">
+              <RotateCcw size={16} strokeWidth={2.4} className="mt-0.5 shrink-0 text-[var(--muted)]" aria-hidden="true" />
+              <span>
+                <strong>Sıfırlanır:</strong> kasa, fincanlar, yükseltmeler, dükkan seviyesi
+              </span>
+            </li>
+          </ul>
+
+          <div className="mt-5 flex gap-2">
+            <button
+              type="button"
+              autoFocus
+              onClick={onConfirm}
+              className="flex-1 rounded-full bg-[var(--ink)] px-5 py-3 text-sm font-semibold text-[var(--on-dark)] transition hover:bg-[var(--roast)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--milk)]"
+            >
+              Şubeyi aç
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-full border border-[var(--line)] px-5 py-3 text-sm font-semibold text-[var(--roast)] transition hover:border-[var(--roast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)]"
+            >
+              Vazgeç
+            </button>
+          </div>
         </div>
       </section>
     </div>

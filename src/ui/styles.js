@@ -119,6 +119,24 @@ ${FONTS}
 .bc-rush-bar { animation: bc-rush-bar linear forwards; transform-origin: left; }
 @keyframes bc-rush-bar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 .bc-combo { animation: bc-pop 0.18s ease-out; }
+/* Telaş kıvılcımları: koyu panelin arkasında iki katman (biri aynalı) yarım tur arayla yükselip söner; siyah zemin
+   "screen" karışımıyla erir, kıvılcımlar kalır. Sarmalayıcı da "screen" ile karışır (opaklığı grubu yalıttığı için),
+   opaklığı kombo arttıkça artar. */
+.bc-sparks { position: absolute; inset: -30% 0; width: 100%; height: 160%; object-fit: cover; mix-blend-mode: screen; pointer-events: none;
+  animation: bc-sparks 3.2s linear infinite; }
+.bc-sparks-b { animation-delay: -1.6s; transform: scaleX(-1); }
+@keyframes bc-sparks { 0% { opacity: 0; translate: 0 22%; } 25%, 70% { opacity: 1; } 100% { opacity: 0; translate: 0 -22%; } }
+/* Çekirdek konfetisi: dükkan büyüyünce ya da yeni şube açılınca fincanın üstünde patlar, sonra dökülüp söner */
+.bc-confetti { position: fixed; z-index: 45; pointer-events: none; width: min(92vw, 440px); height: auto; translate: -50% -50%;
+  -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent); mask-image: linear-gradient(to bottom, #000 78%, transparent);
+  animation: bc-confetti 1.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
+@keyframes bc-confetti {
+  0% { opacity: 0; transform: scale(0.2) rotate(-6deg); }
+  14% { opacity: 1; }
+  32% { transform: scale(1.04) rotate(0deg) translateY(0); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.08) translateY(90px); }
+}
 /* Açılış ekranı: amblem belirir, buhar arkasından yükselir (koyu zeminde siyahı eriterek), ad yükselir, çekirdekler sırayla nabız atar */
 .bc-intro { transition: opacity 0.45s ease, transform 0.45s ease; }
 .bc-intro-out { opacity: 0; transform: scale(1.04); }
@@ -136,6 +154,8 @@ ${FONTS}
   .bc-intro-emblem, .bc-intro-title, .bc-intro-bean { animation: none; }
   .bc-intro, .bc-intro-out { transition: none; transform: none; }
   .bc-rush-halo { animation: none; box-shadow: 0 0 0 6px rgba(208, 146, 74, 0.45); }
+  .bc-sparks { animation: none; opacity: 0.7; }
+  .bc-sparks-b, .bc-confetti { display: none; }
   .bc-hint { animation: none; opacity: 0.7; transform: scale(1.06); }
   .bc-bean { display: none; }
   .bc-float { animation: bc-fade 0.9s ease-out forwards; }

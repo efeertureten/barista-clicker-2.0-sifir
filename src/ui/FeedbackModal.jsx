@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, LoaderCircle, Send, TriangleAlert } from 'lucide-react';
 
+import mailImg from '../barista-assets/icon-mail.webp';
 import Modal, { primaryButton, secondaryButton } from './Modal.jsx';
 import { FEEDBACK_KINDS, FEEDBACK_MAX } from '../cloud/feedback.js';
 import { cloudErrorText } from './CloudPanel.jsx';
@@ -36,7 +37,7 @@ export default function FeedbackModal({ onSend, onClose }) {
 
   if (sent) {
     return (
-      <Modal id="bc-feedback" eyebrow="Geri bildirim" title="Aldık, teşekkürler!" onClose={onClose}>
+      <Modal id="bc-feedback" art={mailImg} eyebrow="Geri bildirim" title="Aldık, teşekkürler!" onClose={onClose}>
         <p className="mt-2 flex items-start gap-2 text-sm leading-snug text-[var(--roast)]">
           <Check size={18} strokeWidth={2.6} className="mt-0.5 shrink-0 text-[var(--crema-deep)]" aria-hidden="true" />
           Yazdıkların doğrudan geliştiriciye ulaştı. Oyun her sürümde bu notlarla biraz daha iyi oluyor.
@@ -49,7 +50,7 @@ export default function FeedbackModal({ onSend, onClose }) {
   }
 
   return (
-    <Modal id="bc-feedback" eyebrow="Geri bildirim" title="Ne düşünüyorsun?" onClose={onClose}>
+    <Modal id="bc-feedback" art={mailImg} eyebrow="Geri bildirim" title="Ne düşünüyorsun?" onClose={onClose}>
       <form onSubmit={submit} className="mt-3 flex flex-col gap-3">
         <div role="radiogroup" aria-label="Tür" className="grid grid-cols-3 gap-1 rounded-full bg-[var(--foam)] p-1">
           {FEEDBACK_KINDS.map((k) => (
