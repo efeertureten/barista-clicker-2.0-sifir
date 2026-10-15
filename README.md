@@ -89,7 +89,7 @@ Oyun aynı kodla [Capacitor](https://capacitorjs.com) üzerinden Android uygulam
 - Oyun dosyaları uygulamanın içinde, yazı tipleri dahil. İnternet olmadan da açılır ve oynanır; yalnızca ölçüm (izin verildiyse) internet ister.
 - Geri tuşu açık pencereyi kapatır (Hoş geldin kartı toplanır, Yeni Şube ve sıfırlama onayı iptal edilir). Kapatacak bir şey yoksa uygulama arka plana alınır, kapanmaz.
 - Uygulama arka plana geçince oyun, tarayıcıda sekme gizlenmiş gibi davranır: üretim çevrimdışı kurallarıyla birikir, müzik durur, oyun kaydedilir. Bunun için `src/platform/native.js` tarayıcının `visibilitychange` olayını Android'in ön plan/arka plan olayıyla birleştirir.
-- Ekran dikey. Çentik ve hareket çubuğu için boşluklar `env(safe-area-inset-*)` ile verilir; sistem çubukları saydam, simgeleri koyu.
+- Ekran dikey. Çentik ve hareket çubuğu için boşluklar `env(safe-area-inset-*)` ile verilir; sistem çubukları saydam; simgeleri açılış ekranında açık, oyunda koyu.
 - Kayıt telefonda saklanır; tarayıcıdaki ilerleme uygulamaya geçmez. Android'in otomatik yedeklemesi açık.
 - Ölçümde `platform` oyuncu özelliği `android` olur (tarayıcıda `web`).
 - **Bildirimler:** Oyuncu çevrimdışı birikimi ilk kez topladığında bir kez sorulur: "Depo dolunca haber verelim mi?". Kabul ederse sistemden izin istenir. Ayar satırındaki "Bildirimler" bağlantısıyla sonradan açılıp kapatılabilir.
@@ -112,7 +112,7 @@ Sırlar yoksa yalnızca ayrı bir deneme uygulaması üretilir ("Barista Deneme"
 
 **Arkadaşlara dağıtım.** İmza sırları tanımlıysa, `main`'deki sürüm (`package.json`) henüz yayınlanmamışsa derleme imzalı APK'yı `v<sürüm>` adıyla GitHub sürümü olarak yayınlar. Yani sürüm numarasını artırıp `main`'e göndermek yeni bir sürüm çıkarmak demek. [Şu bağlantı](https://github.com/efeertureten/barista-clicker-2.0-sifir/releases/latest/download/barista-clicker.apk) hep en son sürümü indirir. Aynı anahtarla imzalandığı için yeni sürüm eskisinin üstüne kurulur, ilerleme silinmez. Sırları ilk kez ekledikten sonra Actions → "Android paketi" → "Run workflow" ile o anki sürüm yayınlanır.
 
-**Simgeler.** `python3 tools/android/make_icons.py`, uyarlanabilir simgeyi ve eski cihazların açılış ekranını `public/icon-512.png`'den yeniden üretir. Android 12 ve sonrasında açılışta köpük renginde zeminde uygulama simgesi görünür.
+**Simgeler.** `python3 tools/android/make_icons.py`, uyarlanabilir simgeyi ve eski cihazların açılış ekranını `public/icon-512.png`'den yeniden üretir. Android 12 ve sonrasında açılışta koyu espresso zeminde uygulama simgesi görünür, ardından aynı zeminde oyunun kendi açılış ekranı gelir; böylece açılışta renk sıçraması olmaz.
 
 **Yerelde.** Android Studio kuruluysa: `npm run android` (derler, Android projesine kopyalar ve Android Studio'da açar).
 
@@ -146,13 +146,16 @@ src/
     firebaseRest.js      anonim giriş ve Firestore belgeleri (REST, SDK'sız)
     cloudSave.js         bulut kaydı: kayıt kodu, yedekleme, geri yükleme, çakışma
     feedback.js          oyun içi geri bildirim
-  ui/                    stiller, market kartları ve kısayolu, rehber, günün siparişleri, Yeni Şube paneli ve onayı, ses düğmesi, veri izni bandı, Hoş geldin kartı
+  ui/                    stiller, açılış ekranı, market kartları ve kısayolu, rehber, günün siparişleri, Yeni Şube paneli ve onayı, ses düğmesi, veri izni bandı, Hoş geldin kartı
   lib/                   localStorage ve dosya yolu yardımcıları
   barista-assets/        oyun görselleri (WebP)
   barista-sounds/        oyun sesleri (MP3)
   main.jsx, index.css    giriş noktası ve Tailwind
 tools/sentetik-beta/     gerçek oyun kodunu oynayan sentetik oyuncu simülatörü ve analizi
 tools/android/           simge üretici ve sürüm kontrolü
+tools/assets/            yeşil zemin temizleyici (Gemini görsellerini saydam WebP'ye çevirir)
+tools/store/             Play mağaza görselleri: oyundan sahne yakalama ve başlıklı kompozisyon
+store/                   Play'e yüklenecek hazır görseller (öne çıkan görsel, 8 ekran görüntüsü, simge)
 android/                 Capacitor Android projesi (oyun dosyaları derlemede içine kopyalanır)
 capacitor.config.json    uygulama kimliği, adı, sistem çubukları
 firestore.rules          Firestore güvenlik kuralları (Firebase konsoluna yapıştırılır)
@@ -259,3 +262,14 @@ Oyuncu özellikleri: `install_cohort` (kurulum günü), `app_version`, `platform
 ## Görseller ve sesler
 
 Bütün görseller ve sesler Google Gemini ile üretildi. Nesnelerin yeşil zeminleri temizlenip şeffaf yapıldı, dükkân sahneleri aynı ölçekte kırpıldı; böylece dükkân büyüdükçe sahne de büyüyor. Ses efektleri Gemini'nin ürettiği parçaların tekil vuruşlarından kesildi, seviyeleri birbirine göre dengelendi. Fincana dokunma sesi (`pop.mp3`) ayrı bir dosyanın ("Satisfying Bubble Pop / Bright Marimba Ding") ilk saniyesinden kesildi: baştaki sessizlik atıldı, sonuna 60 ms sönme eklendi, tek kanala indirildi ve seviyesi eski tıklama sesine göre ayarlandı. Müzik döngüsü, parçanın kendini tekrar eden iki bölümü arasından kuruldu ve dikiş noktası yumuşak geçişle birleştirildi; döngü noktaları `src/audio/sounds.js` içindeki `MUSIC_TRACK` sabitinde. Tarayıcılar ilk etkileşimden önce ses çalmaya izin vermediği için sesler ilk tıklamayla başlar; müzik dosyası da sayfa açılışını yavaşlatmasın diye ancak o zaman indirilir.
+
+**Açılış ekranı.** Oyun espresso renginde bir açılış ekranıyla başlar: amblem, ad ve fincandan yükselen buhar. İlk açılışta "Demle, sat, büyü." sloganıyla yaklaşık 2 saniye, sonraki açılışlarda 1 saniyeden kısa sürer; dokununca hemen geçilir. Buhar, Gemini videosundan kesilmiş dikişsiz bir döngüdür (`steam.webm`, Safari için `steam.mp4`; sessiz, 5,5 sn). "Hareketi azalt" açıksa video yüklenmez. `?debug=1` ile açılış ekranı atlanır; `?intro=1` her durumda gösterir, `?intro=0` gizler.
+
+**Şeffaf simgeler.** Gemini görselleri yeşil zeminde üretilir. `python3 tools/assets/key_green.py <girdi> <çıktı.webp> <en uzun kenar px> [kalite]` zemini kenarlardan ölçer, yarı saydam kenarlardaki yeşili geri çözer (buhar ve parlamalar yeşilimsi kalmasın diye) ve nesneye göre kırpar. Amblem, Altın Çekirdek, yıldız ve Kahve Telaşı simgesi böyle üretildi.
+
+**Mağaza görselleri.** Hepsi gerçek oyundan üretilir, elle düzenlenmez:
+
+1. `npm run build && python3 tools/store/capture.py <klasör>` oyunu sekiz hazır kayıtla açar ve sahneleri yakalar (dokunuş sayıları, market, Kahve Telaşı, siparişler, Hoş geldin kartı, yeni şube, bulut kaydı). Tek sahne için sonuna `01 04` gibi numaralar eklenir.
+2. `python3 tools/store/compose.py <klasör> <B1 afiş> <B2 zemin>` oyunun yazı tipleriyle başlıkları ekler ve şunları yazar: `store/feature-graphic.png` (1024×500), `store/screenshots/01–08.jpg` (1080×1920), `store/icon-512.png` ve paylaşım önizlemesi `public/og-image.jpg` (1200×630). Başlıklar `compose.py` içindeki `CAPTIONS` listesinde.
+
+B1 (afiş zemini, minyatür mahalle) ve B2 (ekran görüntüsü zemini, çekirdekler) Gemini görselleridir; depoda tutulmazlar, çıktılar tutulur.

@@ -2,7 +2,7 @@
   "appId": "io.github.efeertureten.baristaclicker",
   "appName": "Barista Clicker",
   "webDir": "dist",
-  "backgroundColor": "#f1e6d6",
+  "backgroundColor": "#24150d",
   "android": {
     "allowMixedContent": false,
     "captureInput": false,
@@ -12,7 +12,7 @@
     "SystemBars": {
       "insetsHandling": "native",
       "initialViewportFitValueHint": "cover",
-      "style": "LIGHT"
+      "style": "DARK"
     },
     "LocalNotifications": {
       "smallIcon": "ic_stat_cup",

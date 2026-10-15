@@ -14,11 +14,11 @@
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
         <!-- Eski WebView'larda sistem çubuklarının arkası: oyunun köpük rengi (koyu modda da) -->
-        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:windowBackground">@color/window_background</item>
     </style>
 
 
-    <!-- Açılış: Android 12+ köpük zeminde uygulama simgesi, daha eskilerde drawable/splash -->
+    <!-- Açılış: Android 12+ espresso zeminde uygulama simgesi, daha eskilerde drawable/splash; ardından oyunun açılış ekranı -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
         <item name="android:background">@drawable/splash</item>

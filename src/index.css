@@ -9,7 +9,8 @@ body,
   height: 100%;
 }
 
+/* Açılış ekranı sürerken sayfa zemini koyu (index.html), sonra oyunun köpük rengi (BaristaClicker ayarlar) */
 body {
   margin: 0;
-  background: #f1e6d6;
+  background: var(--bc-page-bg, #f1e6d6);
 }

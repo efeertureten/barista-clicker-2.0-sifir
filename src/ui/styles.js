@@ -119,8 +119,22 @@ ${FONTS}
 .bc-rush-bar { animation: bc-rush-bar linear forwards; transform-origin: left; }
 @keyframes bc-rush-bar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 .bc-combo { animation: bc-pop 0.18s ease-out; }
+/* Açılış ekranı: amblem belirir, buhar arkasından yükselir (koyu zeminde siyahı eriterek), ad yükselir, çekirdekler sırayla nabız atar */
+.bc-intro { transition: opacity 0.45s ease, transform 0.45s ease; }
+.bc-intro-out { opacity: 0; transform: scale(1.04); }
+.bc-intro-emblem { animation: bc-intro-in 0.6s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
+.bc-intro-title { animation: bc-intro-rise 0.5s ease-out 0.2s both; }
+.bc-intro-steam { width: 92%; height: 92%; left: -4%; top: -46%; mix-blend-mode: screen; opacity: 0.6; animation: bc-fade-in 0.8s ease-out both;
+  -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent 100%); mask-image: radial-gradient(closest-side, #000 55%, transparent 100%); }
+.bc-intro-bean { animation: bc-intro-bean 0.9s ease-in-out infinite; }
+@keyframes bc-intro-in { from { opacity: 0; transform: scale(0.86) translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes bc-intro-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes bc-intro-bean { 0%, 100% { opacity: 0.35; transform: translateY(0) scale(0.9); } 40% { opacity: 1; transform: translateY(-4px) scale(1.05); } }
+@keyframes bc-fade-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .bc-bob, .bc-ring, .bc-toast, .bc-scene-in, .bc-pop, .bc-rise, .bc-guide-card, .bc-rush-ready, .bc-combo { animation: none; }
+  .bc-bob, .bc-ring, .bc-toast, .bc-scene-in, .bc-pop, .bc-rise, .bc-guide-card, .bc-rush-ready, .bc-combo,
+  .bc-intro-emblem, .bc-intro-title, .bc-intro-bean { animation: none; }
+  .bc-intro, .bc-intro-out { transition: none; transform: none; }
   .bc-rush-halo { animation: none; box-shadow: 0 0 0 6px rgba(208, 146, 74, 0.45); }
   .bc-hint { animation: none; opacity: 0.7; transform: scale(1.06); }
   .bc-bean { display: none; }

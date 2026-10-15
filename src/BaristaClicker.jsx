@@ -4,7 +4,6 @@ import {
   BellOff,
   Flame,
   MousePointerClick,
-  Star,
   Music,
   RotateCcw,
   ShoppingBag,
@@ -41,7 +40,8 @@ import MarketShortcut from './ui/MarketShortcut.jsx';
 import { BranchModal, BranchPanel } from './ui/Branch.jsx';
 import DailyOrders from './ui/DailyOrders.jsx';
 import { advanceStreak, dayKeyOf, streakAlive } from './game/orders.js';
-import { PLATFORM, isHidden, onBackButton, onVisibilityChange } from './platform/native.js';
+import { PLATFORM, isHidden, onBackButton, onVisibilityChange, setSystemBarsDark } from './platform/native.js';
+import Intro, { introEnabled } from './ui/Intro.jsx';
 import {
   adoptCloud,
   checkCloud,
@@ -58,6 +58,8 @@ import CloudPanel from './ui/CloudPanel.jsx';
 import FeedbackModal from './ui/FeedbackModal.jsx';
 import NotifyPrompt from './ui/NotifyPrompt.jsx';
 import RushPanel from './ui/RushPanel.jsx';
+import starImg from './barista-assets/star.webp';
+import rushImg from './barista-assets/rush.webp';
 import ShopProgress from './ui/ShopProgress.jsx';
 import { planReminders } from './game/reminders.js';
 import {
@@ -127,6 +129,8 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
   // Bildirimler (yalnızca Android): tercih ve ilk toplamadan sonra çıkan soru
   const [notifyPref, setNotifyPrefState] = useState(() => readText(NOTIFY_PREF_KEY));
   const [notifyPromptOpen, setNotifyPromptOpen] = useState(false);
+  // Açılış ekranı: her açılışta bir kez (hata ayıklama modunda kapalı)
+  const [introOn, setIntroOn] = useState(() => introEnabled());
   // Kahve Telaşı: süren telaşın sayaçları ref'te (her dokunuşta değişir); rushActive çizimi tetikler
   const rushRef = useRef(null);
   const [rushActive, setRushActive] = useState(false);
@@ -353,7 +357,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
       key: `star-${s.branches}-${starsReached}`,
       title: count > 1 ? `${count} yıldız birden!` : 'Yıldız: ara hedefe ulaştın',
       subtitle: `+${gold} Altın Çekirdek · +${fmtMoney(money)}`,
-      icon: Star,
+      image: starImg,
     });
     analytics.track('star_reached', { stars: starsReached, count, shop_level: economy.levelOf(s) + 1, value: Math.round(money) });
     if (gold) analytics.track('earn_virtual_currency', { virtual_currency_name: 'Altın Çekirdek', value: gold, source: 'star' });
@@ -954,7 +958,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
         key: `rush-${run.startedAt}`,
         title: `Telaş bitti: +${fmt(run.coffees)} fincan`,
         subtitle: `${run.taps} dokunuş · en yüksek kombo ${run.maxCombo} (×${run.maxMult.toLocaleString('tr-TR', { maximumFractionDigits: 1 })})`,
-        icon: Flame,
+        image: rushImg,
       });
     }
     analytics.track('rush_end', {
@@ -1071,9 +1075,19 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notifyOn]);
 
+  // Açılış sürerken sayfa zemini ve sistem çubukları koyu, sonra oyunun açık rengi
+  useEffect(() => {
+    document.documentElement.style.setProperty('--bc-page-bg', introOn ? '#24150d' : '#f1e6d6');
+    setSystemBarsDark(introOn);
+  }, [introOn]);
+
   // Android geri tuşu: önce açık pencereyi kapatır; kapatacak bir şey yoksa uygulama arka plana alınır
   const backRef = useRef(() => false);
   backRef.current = () => {
+    if (introOn) {
+      setIntroOn(false);
+      return true;
+    }
     if (notifyPromptOpen) {
       setNotifyPromptOpen(false);
       return true;
@@ -1240,7 +1254,7 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
                 )}
                 {nextStar && (
                   <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--roast)]">
-                    <Star size={13} strokeWidth={2.2} className="shrink-0 fill-[var(--crema-soft)] text-[var(--crema-deep)]" aria-hidden="true" />
+                    <img src={src(starImg)} alt="" width={16} height={16} draggable={false} className="bc-img h-4 w-4 shrink-0 object-contain" />
                     <span>
                       Sonraki yıldız <strong className="bc-mono font-semibold">{fmt(nextStar)}</strong> fincanda: +
                       {config.stars.gold} Altın Çekirdek ve {Math.round(config.stars.rewardSeconds / 60)} dk'lık kazanç
@@ -1608,6 +1622,9 @@ export default function BaristaClicker({ initialSave, onSave, config: configProp
           onClose={() => setNotifyPromptOpen(false)}
         />
       )}
+
+      {/* ---------------- Açılış ekranı ---------------- */}
+      {introOn && <Intro firstLaunch={!hadSaveAtStart} onDone={() => setIntroOn(false)} />}
 
       {/* ---------------- Veri izni ---------------- */}
       {consentOpen && analytics.isConfigured() && (

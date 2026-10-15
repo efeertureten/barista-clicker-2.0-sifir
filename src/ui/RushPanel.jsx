@@ -1,7 +1,9 @@
 import React from 'react';
-import { Flame, Timer } from 'lucide-react';
+import { Timer } from 'lucide-react';
 
+import rushImg from '../barista-assets/rush.webp';
 import { fmt, fmtDuration } from '../game/format.js';
+import { src } from '../lib/asset.js';
 
 const multText = (m) => `×${m.toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
 
@@ -18,7 +20,7 @@ export default function RushPanel({ status, readyIn, cfg, run, now, onStart }) {
         <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-3">
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--crema)]">
-              <Flame size={13} strokeWidth={2.4} aria-hidden="true" /> Kahve Telaşı
+              <img src={src(rushImg)} alt="" width={14} height={18} draggable={false} className="bc-img h-[18px] w-auto" /> Kahve Telaşı
             </p>
             <p className="mt-0.5 text-xs text-[var(--on-dark-muted)]">
               <span className="bc-mono">{run.combo}</span> kombo · <span className="bc-mono">{Math.ceil(left)}</span> sn
@@ -47,9 +49,7 @@ export default function RushPanel({ status, readyIn, cfg, run, now, onStart }) {
         onClick={onStart}
         className="bc-rush-ready group inline-flex items-center gap-3 rounded-full bg-[var(--ink)] py-2.5 pl-3 pr-5 text-left text-[var(--on-dark)] transition hover:bg-[var(--roast)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crema)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--foam)]"
       >
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-[var(--crema)] text-[var(--espresso)]">
-          <Flame size={20} strokeWidth={2.4} aria-hidden="true" />
-        </span>
+        <img src={src(rushImg)} alt="" width={121} height={160} draggable={false} className="bc-img -my-1 h-11 w-auto" />
         <span>
           <span className="block text-sm font-semibold">Kahve Telaşı</span>
           <span className="block text-xs text-[var(--on-dark-muted)]">

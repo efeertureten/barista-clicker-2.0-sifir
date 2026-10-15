@@ -5,8 +5,9 @@
 - Uyarlanabilir simge (Android 8+): arka plan düz krema rengi, ön plan fincan ve tabağı (kaynaktaki daire
   kesilir, altına yumuşak bir gölge eklenir). Tabak 50 dp: 108 dp katmanın güvenli bölgesine (66 dp) rahatça sığar.
 - Eski simgeler (Android 7): yuvarlatılmış kare ve daire.
-- Açılış ekranı (Android 7–11): köpük renginde zemin, ortada yuvarlak simge. Android 12+ sistemin kendi
-  açılış ekranını gösterir (styles.xml: köpük zemin + uygulama simgesi).
+- Açılış ekranı (Android 7–11): koyu espresso zemin, ortada yuvarlak simge. Android 12+ sistemin kendi
+  açılış ekranını gösterir (styles.xml: espresso zemin + uygulama simgesi); ardından oyunun açılış ekranı
+  aynı zeminde başlar.
 """
 from pathlib import Path
 
@@ -17,7 +18,8 @@ SRC = ROOT / 'public' / 'icon-512.png'
 RES = ROOT / 'android' / 'app' / 'src' / 'main' / 'res'
 
 CREMA = (206, 138, 67)  # kaynak simgenin zemini (#CE8A43)
-FOAM = (241, 230, 214)  # oyunun köpük rengi (#F1E6D6)
+FOAM = (241, 230, 214)  # oyunun köpük rengi (#F1E6D6): sistem çubuklarının arkası
+ESPRESSO = (36, 21, 13)  # açılış ekranının zemini (#24150D): açılış ve oyunun açılış ekranı aynı renkte
 SAUCER_CENTER, SAUCER_RADIUS = (252, 252), 152  # kaynakta tabağın dairesi (512 px)
 
 DENSITIES = {'mdpi': 1, 'hdpi': 1.5, 'xhdpi': 2, 'xxhdpi': 3, 'xxxhdpi': 4}
@@ -72,7 +74,7 @@ def legacy(src, px, round_icon):
 
 
 def splash(src, w, h):
-    out = Image.new('RGB', (w, h), FOAM)
+    out = Image.new('RGB', (w, h), ESPRESSO)
     d = round(min(w, h) * 0.36)
     icon = legacy(src, d, round_icon=True)
     out.paste(icon, ((w - d) // 2, (h - d) // 2), icon)
@@ -93,7 +95,8 @@ def main():
     (RES / 'values' / 'ic_launcher_background.xml').write_text(
         '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
         '    <color name="ic_launcher_background">#%02X%02X%02X</color>\n'
-        '    <color name="splash_background">#%02X%02X%02X</color>\n</resources>\n' % (CREMA + FOAM))
+        '    <color name="splash_background">#%02X%02X%02X</color>\n'
+        '    <color name="window_background">#%02X%02X%02X</color>\n</resources>\n' % (CREMA + ESPRESSO + FOAM))
     print('simgeler ve açılış ekranları güncellendi')
 
 

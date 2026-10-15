@@ -1,7 +1,7 @@
 import React from 'react';
 import { Check, Coffee, Coins, Flame, Gift, MousePointerClick, ShoppingBag, Snowflake, Zap } from 'lucide-react';
 
-import beanImg from '../barista-assets/bean.webp';
+import goldBeanImg from '../barista-assets/gold-bean.webp';
 import { src } from '../lib/asset.js';
 import { fmt, fmtMoney } from '../game/format.js';
 
@@ -9,13 +9,13 @@ import { fmt, fmtMoney } from '../game/format.js';
 export function GoldBean({ size = 16 }) {
   return (
     <img
-      src={src(beanImg)}
+      src={src(goldBeanImg)}
       alt=""
       width={size}
       height={size}
       draggable={false}
-      className="bc-img inline-block shrink-0"
-      style={{ width: size, height: size, filter: 'sepia(1) saturate(3.2) hue-rotate(2deg) brightness(1.18)' }}
+      className="bc-img inline-block shrink-0 object-contain"
+      style={{ width: size, height: size }}
     />
   );
 }

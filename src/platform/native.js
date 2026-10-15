@@ -1,6 +1,6 @@
 // Oyun tarayıcıda mı, Android uygulamasının (Capacitor) içinde mi çalışıyor? Uygulamaya özgü olaylar burada
 // tek yerde toplanır; oyunun geri kalanı yalnızca bu dosyadaki işlevleri kullanır ve tarayıcıda aynen çalışır.
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 
 export const PLATFORM = Capacitor.getPlatform(); // 'web' | 'android' | 'ios'
 export const IS_NATIVE = Capacitor.isNativePlatform();
@@ -52,6 +52,14 @@ export function onVisibilityChange(cb) {
   };
   subscribers.add(fn);
   return () => subscribers.delete(fn);
+}
+
+/* ---- Sistem çubukları ---- */
+
+// Koyu zeminde (açılış ekranı) açık renk simgeler, oyunda koyu simgeler. Tarayıcıda hiçbir şey yapmaz.
+export function setSystemBarsDark(dark) {
+  if (!IS_NATIVE) return;
+  SystemBars.setStyle({ style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light }).catch(() => {});
 }
 
 /* ---- Android geri tuşu ---- */
